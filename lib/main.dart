@@ -71,8 +71,26 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: '파일 비교 툴',
       home: FileComparePage(),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.amber,
+          brightness: Brightness.dark,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            elevation: 0.0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+          ),
+        ),
+      ),
     );
   }
+}
+/// 커스텀 colors
+extension AppColors on ColorScheme {
+  Color get highlightSame => (brightness == Brightness.dark) ? const Color(0x2219ff19): const Color(0xffe6ffe6);
+  Color get highlightDiff => (brightness == Brightness.dark) ? const Color(0x22ff1919): const Color(0xffffe6e6);
+  Color get highlightOther => Colors.transparent;
 }
 
 class FileComparePage extends StatefulWidget {
@@ -112,7 +130,7 @@ class _FileComparePageState extends State<FileComparePage> {
                   margin: EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
                     border: Border.all(
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.outlineVariant,
                         width: 2.0),
                   ),
                   child: _buildCompareResults(),
@@ -139,7 +157,9 @@ class _FileComparePageState extends State<FileComparePage> {
                           margin: EdgeInsets.all(8.0),
                           decoration: BoxDecoration(
                             border: Border.all(
-                                color: leftDragging ? Colors.blue : Colors.grey,
+                                color: leftDragging
+                                  ? Theme.of(context).colorScheme.outline
+                                  : Theme.of(context).colorScheme.outlineVariant,
                                 width: 2.0),
                           ),
                           child: _buildFileList(leftFiles, "Left Area"),
@@ -166,7 +186,9 @@ class _FileComparePageState extends State<FileComparePage> {
                           margin: EdgeInsets.all(8.0),
                           decoration: BoxDecoration(
                             border: Border.all(
-                                color: rightDragging ? Colors.blue : Colors.grey,
+                                color: rightDragging
+                                  ? Theme.of(context).colorScheme.outline
+                                  : Theme.of(context).colorScheme.outlineVariant,
                                 width: 2.0),
                           ),
                           child: _buildFileList(rightFiles, "Right Area"),
@@ -183,13 +205,13 @@ class _FileComparePageState extends State<FileComparePage> {
             child: SizedBox(
               width: double.infinity,
               height: 50,
-            child: (isComparing)
-              ? const CircularProgressIndicator()
-              : ElevatedButton(
-                  onPressed: _onButtonPressed,
-                  child: Text(comparisonDone ? "Reset List" : "Compare Start"),
+              child: (isComparing)
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _onButtonPressed,
+                    child: Text(comparisonDone ? "Reset List" : "Compare Start"),
                   ),
-                ),
+            ),
           ),
         ],
       ),
@@ -263,7 +285,7 @@ class _FileComparePageState extends State<FileComparePage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          color: Colors.grey[300],
+          color: Theme.of(context).colorScheme.surfaceBright,
           padding: EdgeInsets.all(8.0),
           child: Wrap(
             spacing: 8.0,
@@ -471,7 +493,7 @@ class _FileComparePageState extends State<FileComparePage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          color: Colors.grey[300],
+          color: Theme.of(context).colorScheme.surfaceBright,
           padding: EdgeInsets.all(8.0),
           child: Wrap(
             spacing: 8.0,
@@ -493,19 +515,19 @@ class _FileComparePageState extends State<FileComparePage> {
               Color tileColor;
               switch (res.status) {
                 case CompareStatus.same:
-                  tileColor = Color(0xffe6ffe6);
+                  tileColor = Theme.of(context).colorScheme.highlightSame;
                   break;
                 case CompareStatus.diffSize:
-                  tileColor = Color(0xffffe6e6);
+                  tileColor = Theme.of(context).colorScheme.highlightDiff;
                   break;
                 case CompareStatus.diffHash:
-                  tileColor = Color(0xffffe6e6);
+                  tileColor = Theme.of(context).colorScheme.highlightDiff;
                   break;
                 case CompareStatus.onlyLeft:
-                  tileColor = Colors.transparent;
+                  tileColor = Theme.of(context).colorScheme.highlightOther;
                   break;
                 case CompareStatus.onlyRight:
-                  tileColor = Colors.transparent;
+                  tileColor = Theme.of(context).colorScheme.highlightOther;
                   break;
               }
 
