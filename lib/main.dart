@@ -229,9 +229,19 @@ class _FileComparePageState extends State<FileComparePage> {
         Container(
           color: Colors.grey[300],
           padding: EdgeInsets.all(8.0),
-          child: Text(
-            title,
-            style: TextStyle(fontWeight: FontWeight.bold),
+          child: Wrap(
+            spacing: 8.0,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              ElevatedButton(
+                onPressed: () => setState(() {files.clear();}),
+                child: Text("Clear"),
+              ),
+              Text(
+                "${files.length} files",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
         ),
         Expanded(
