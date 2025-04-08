@@ -102,7 +102,7 @@ class _FileComparePageState extends State<FileComparePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('파일 비교 툴'),
+        title: Text('파일 비교'),
       ),
       body: Column(
         children: [
@@ -115,7 +115,7 @@ class _FileComparePageState extends State<FileComparePage> {
                         color: Colors.grey,
                         width: 2.0),
                   ),
-                  child: buildCompareResults(),
+                  child: _buildCompareResults(),
                 )
               : Row(
                   children: [
@@ -176,15 +176,19 @@ class _FileComparePageState extends State<FileComparePage> {
                   ],
                 ),
           ),
-          const Divider(),
+          const Divider(height: 8, thickness: 2,),
           // 비교 버튼 및 결과 표시
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 16.0),
+            child: SizedBox(
+              width: double.infinity,
+              height: 50,
             child: (isComparing)
               ? const CircularProgressIndicator()
               : ElevatedButton(
                   onPressed: _onButtonPressed,
                   child: Text(comparisonDone ? "Reset List" : "Compare Start"),
+                  ),
                 ),
           ),
         ],
@@ -282,7 +286,8 @@ class _FileComparePageState extends State<FileComparePage> {
                 padding: EdgeInsets.all(8.0),
                 child: Text("여기에 파일 또는 디렉토리를 드래그하세요."),
               )
-            : ListView.builder(
+            : ListView.separated(
+            separatorBuilder: (context, index) { return const Divider(height: 0); },
               itemCount: files.length,
               itemBuilder: (context, index) {
                 FileItem item = files[index];
@@ -329,6 +334,12 @@ class _FileComparePageState extends State<FileComparePage> {
       });
     }
   }
+
+  /// isolate에서 호출할 해시 계산 함수 (동기적으로 파일을 읽어 MD5 해시를 계산)
+  Future<String> _calculateHash(String filePath) async {
+    final bytes = File(filePath).readAsBytesSync();
+    return md5.convert(bytes).toString();
+  }
   /// 비교 프로세스 A: relativePath를 기반으로 필터링 후 해시 비교
   Future<List<CompareResult>> _compareFilesWithPath(List<FileItem> left, List<FileItem> right) async {
     // 각각을 relativePath를 key로 하는 맵으로 변환합니다.
@@ -360,8 +371,8 @@ class _FileComparePageState extends State<FileComparePage> {
           ));
         } else {
           // 2. MD5 해시 비교 (크기가 동일한 경우)
-          final leftHash = await calculateHash(leftItem.fullPath);
-          final rightHash = await calculateHash(rightItem.fullPath);
+          final leftHash = await _calculateHash(leftItem.fullPath);
+          final rightHash = await _calculateHash(rightItem.fullPath);
           if (leftHash == rightHash) {
             results.add(CompareResult(
               status: CompareStatus.same,
@@ -428,11 +439,11 @@ class _FileComparePageState extends State<FileComparePage> {
 
       Map<String, FileItem> leftHashes = {};
       for (var leftItem in leftGroup) {
-        String hash = await compute(calculateHash, leftItem.fullPath);
+        String hash = await compute(_calculateHash, leftItem.fullPath);
         leftHashes[hash] = leftItem;
       }
       for (var rightItem in rightGroup) {
-        String hash = await compute(calculateHash, rightItem.fullPath);
+        String hash = await compute(_calculateHash, rightItem.fullPath);
         if (leftHashes.containsKey(hash)) {
           // 동일한 파일 존재
           // 이름만 다르지 동일한 내용을 가질 수도 있음
@@ -455,7 +466,7 @@ class _FileComparePageState extends State<FileComparePage> {
   }
 
   /// 비교 결과를 표시하는 위젯
-  Widget buildCompareResults() {
+  Widget _buildCompareResults() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -475,7 +486,7 @@ class _FileComparePageState extends State<FileComparePage> {
         ),
         Expanded(
           child: ListView.separated(
-            separatorBuilder: (context, index) { return const Divider(); },
+            separatorBuilder: (context, index) { return const Divider(height: 0); },
             itemCount: compareResults.length,
             itemBuilder: (context, index) {
               final res = compareResults[index];
@@ -533,13 +544,13 @@ class _FileComparePageState extends State<FileComparePage> {
     );
   }
 
-  /// 경고 메시지 출력 (SnackBar 이용)
+  /// 경고 메시지 출력
   void _showAlert(String message) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("경고"),
+          title: const Text("주의"),
           content: Text(message),
           actions: [
             TextButton(
@@ -552,10 +563,4 @@ class _FileComparePageState extends State<FileComparePage> {
       }
     );
   }
-}
-
-/// isolate에서 호출할 해시 계산 함수 (동기적으로 파일을 읽어 MD5 해시를 계산)
-Future<String> calculateHash(String filePath) async {
-  final bytes = File(filePath).readAsBytesSync();
-  return md5.convert(bytes).toString();
 }
