@@ -19,6 +19,11 @@ class FileItem {
     required this.modified,
     required this.relativePath,
   });
+
+  @override
+  String toString() {
+    return "$fileName ($relativePath)";
+  }
 }
 
 class CompareResult {
@@ -176,6 +181,9 @@ class _FileComparePageState extends State<FileComparePage> {
   /// 드롭된 URL(파일/디렉토리 경로)를 처리하여 파일 목록에 추가
   Future<void> _processDroppedItems(List<DropItem> urls, {required bool isLeft}) async {
     List<FileItem> newFiles = [];
+    List<FileItem> targetFiles = (isLeft ? leftFiles: rightFiles);
+    List<String> existingPaths = targetFiles.map((file) => file.relativePath).toList();
+    List<FileItem> duplicateFiles = [];
     for (var uri in urls) {
       String path = uri.path;
       final fileEntity = FileSystemEntity.typeSync(path);
@@ -185,13 +193,18 @@ class _FileComparePageState extends State<FileComparePage> {
           if (entity is File) {
             try {
               var stat = await entity.stat();
-              newFiles.add(FileItem(
+              final newFileItem = FileItem(
                 fullPath: entity.path,
                 fileName: entity.uri.pathSegments.last,
                 fileSize: stat.size,
                 modified: stat.modified,
                 relativePath: pathlib.relative(entity.path, from: path),
-              ));
+              );
+              if (existingPaths.contains(newFileItem.relativePath)) {
+                duplicateFiles.add(newFileItem);
+              } else {
+                newFiles.add(newFileItem);
+              }
             } catch (e) {
               // 오류 무시
             }
@@ -200,24 +213,29 @@ class _FileComparePageState extends State<FileComparePage> {
       } else if (fileEntity == FileSystemEntityType.file) {
         try {
           var stat = await File(path).stat();
-          newFiles.add(FileItem(
+          final newFileItem = FileItem(
             fullPath: path,
             fileName: path.split(Platform.pathSeparator).last,
             fileSize: stat.size,
             modified: stat.modified,
             relativePath: pathlib.relative(path, from: pathlib.dirname(path)),
-          ));
+          );
+          if (existingPaths.contains(newFileItem.relativePath)) {
+            duplicateFiles.add(newFileItem);
+          } else {
+            newFiles.add(newFileItem);
+          }
         } catch (e) {
           // 오류 무시
         }
       }
     }
+
+    if (duplicateFiles.isNotEmpty) {
+      _showAlert("${duplicateFiles.length}개의 파일이 이미 업로드 되어있습니다.\n\n--- 중복된 파일 목록---\n${duplicateFiles.join('\n')}");
+    }
     setState(() {
-      if (isLeft) {
-        leftFiles.addAll(newFiles);
-      } else {
-        rightFiles.addAll(newFiles);
-      }
+      targetFiles.addAll(newFiles);
     });
   }
 
