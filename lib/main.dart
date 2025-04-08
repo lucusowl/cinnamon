@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as pathlib;
 
 /// 파일 정보를 담기 위한 클래스
 class FileItem {
@@ -184,14 +185,12 @@ class _FileComparePageState extends State<FileComparePage> {
           if (entity is File) {
             try {
               var stat = await entity.stat();
-              // relativePath는 drop한 디렉토리 기준으로 계산
-              String relative = entity.path.replaceFirst(path, '');
               newFiles.add(FileItem(
                 fullPath: entity.path,
                 fileName: entity.uri.pathSegments.last,
                 fileSize: stat.size,
                 modified: stat.modified,
-                relativePath: relative,
+                relativePath: pathlib.relative(entity.path, from: path),
               ));
             } catch (e) {
               // 오류 무시
@@ -206,7 +205,7 @@ class _FileComparePageState extends State<FileComparePage> {
             fileName: path.split(Platform.pathSeparator).last,
             fileSize: stat.size,
             modified: stat.modified,
-            relativePath: path, // 단일 파일의 경우 전체 경로 사용
+            relativePath: pathlib.relative(path, from: pathlib.dirname(path)),
           ));
         } catch (e) {
           // 오류 무시

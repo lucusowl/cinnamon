@@ -38,6 +38,7 @@ dependencies:
   # 
   desktop_drop:
   crypto:
+  path:
 
 dev_dependencies:
   flutter_test:
