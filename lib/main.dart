@@ -26,9 +26,16 @@ class FileItem {
   }
 }
 
+enum CompareStatus {
+  same,       // 동일
+  diffSize,   // 다름(크기)
+  diffHash,   // 다름(내용)
+  onlyLeft,   // 왼쪽에만 있음
+  onlyRight,  // 오른쪽에만 있음
+}
 class CompareResult {
   final String relativePath;
-  final String status; // "동일", "다름", "왼쪽에만 있음", "오른쪽에만 있음"
+  final CompareStatus status;
   final String? leftFullPath;
   final String? rightFullPath;
   final int? leftSize;
@@ -97,82 +104,86 @@ class _FileComparePageState extends State<FileComparePage> {
       body: Column(
         children: [
           Expanded(
-            child: Row(
-              children: [
-                // 좌측 드롭 영역
-                Expanded(
-                  child: DropTarget(
-                    onDragDone: (details) async {
-                      await _processDroppedItems(details.files, isLeft: true);
-                    },
-                    onDragEntered: (_) {
-                      setState(() {
-                        leftDragging = true;
-                      });
-                    },
-                    onDragExited: (_) {
-                      setState(() {
-                        leftDragging = false;
-                      });
-                    },
-                    child: Container(
-                      margin: EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                            color: leftDragging ? Colors.blue : Colors.grey,
-                            width: 2.0),
-                      ),
-                      child: _buildFileList(leftFiles, "Left Area"),
-                    ),
+            child: (comparisonDone)
+              ? Container(
+                  margin: EdgeInsets.all(8.0),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                        color: Colors.grey,
+                        width: 2.0),
                   ),
-                ),
-                // 우측 드롭 영역
-                Expanded(
-                  child: DropTarget(
-                    onDragDone: (details) async {
-                      await _processDroppedItems(details.files, isLeft: false);
-                    },
-                    onDragEntered: (_) {
-                      setState(() {
-                        rightDragging = true;
-                      });
-                    },
-                    onDragExited: (_) {
-                      setState(() {
-                        rightDragging = false;
-                      });
-                    },
-                    child: Container(
-                      margin: EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                            color: rightDragging ? Colors.blue : Colors.grey,
-                            width: 2.0),
+                  child: buildCompareResults(),
+                )
+              : Row(
+                  children: [
+                    // 좌측 드롭 영역
+                    Expanded(
+                      child: DropTarget(
+                        onDragDone: (details) async {
+                          await _processDroppedItems(details.files, isLeft: true);
+                        },
+                        onDragEntered: (_) {
+                          setState(() {
+                            leftDragging = true;
+                          });
+                        },
+                        onDragExited: (_) {
+                          setState(() {
+                            leftDragging = false;
+                          });
+                        },
+                        child: Container(
+                          margin: EdgeInsets.all(8.0),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                                color: leftDragging ? Colors.blue : Colors.grey,
+                                width: 2.0),
+                          ),
+                          child: _buildFileList(leftFiles, "Left Area"),
+                        ),
                       ),
-                      child: _buildFileList(rightFiles, "Right Area"),
                     ),
-                  ),
+                    // 우측 드롭 영역
+                    Expanded(
+                      child: DropTarget(
+                        onDragDone: (details) async {
+                          await _processDroppedItems(details.files, isLeft: false);
+                        },
+                        onDragEntered: (_) {
+                          setState(() {
+                            rightDragging = true;
+                          });
+                        },
+                        onDragExited: (_) {
+                          setState(() {
+                            rightDragging = false;
+                          });
+                        },
+                        child: Container(
+                          margin: EdgeInsets.all(8.0),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                                color: rightDragging ? Colors.blue : Colors.grey,
+                                width: 2.0),
+                          ),
+                          child: _buildFileList(rightFiles, "Right Area"),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
           ),
           const Divider(),
           // 비교 버튼 및 결과 표시
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Column(
-              children: [
-                ElevatedButton(
+            child: (isComparing)
+              ? const CircularProgressIndicator()
+              : ElevatedButton(
                   onPressed: _onButtonPressed,
                   child: Text(comparisonDone ? "Reset List" : "Compare Start"),
                 ),
-                SizedBox(height: 10),
-                isComparing
-                  ? const CircularProgressIndicator()
-                  : buildCompareResults(),
-              ],
-            ),
-          )
+          ),
         ],
       ),
     );
@@ -337,7 +348,7 @@ class _FileComparePageState extends State<FileComparePage> {
         if (leftItem.fileSize != rightItem.fileSize) {
           results.add(CompareResult(
             relativePath: key,
-            status: "다름 (크기 불일치)",
+            status: CompareStatus.diffSize,
             leftFullPath: leftItem.fullPath,
             rightFullPath: rightItem.fullPath,
             leftSize: leftItem.fileSize,
@@ -350,7 +361,7 @@ class _FileComparePageState extends State<FileComparePage> {
           if (leftHash == rightHash) {
             results.add(CompareResult(
               relativePath: key,
-              status: "동일",
+              status: CompareStatus.same,
               leftFullPath: leftItem.fullPath,
               rightFullPath: rightItem.fullPath,
               leftSize: leftItem.fileSize,
@@ -361,7 +372,7 @@ class _FileComparePageState extends State<FileComparePage> {
           } else {
             results.add(CompareResult(
               relativePath: key,
-              status: "다름 (내용 불일치)",
+              status: CompareStatus.diffHash,
               leftFullPath: leftItem.fullPath,
               rightFullPath: rightItem.fullPath,
               leftSize: leftItem.fileSize,
@@ -374,14 +385,14 @@ class _FileComparePageState extends State<FileComparePage> {
       } else if (leftItem != null && rightItem == null) {
         results.add(CompareResult(
           relativePath: key,
-          status: "왼쪽에만 있음",
+          status: CompareStatus.onlyLeft,
           leftFullPath: leftItem.fullPath,
           leftSize: leftItem.fileSize,
         ));
       } else if (leftItem == null && rightItem != null) {
         results.add(CompareResult(
           relativePath: key,
-          status: "오른쪽에만 있음",
+          status: CompareStatus.onlyRight,
           rightFullPath: rightItem.fullPath,
           rightSize: rightItem.fileSize,
         ));
@@ -402,31 +413,79 @@ class _FileComparePageState extends State<FileComparePage> {
   /// 비교 결과를 표시하는 위젯
   Widget buildCompareResults() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          "비교 알고리즘:\n  1. 파일 경로(상대경로)를 기준으로 매칭\n  2. 파일 크기 비교\n  3. 크기가 동일할 경우 MD5 해시 비교 (내용 확인)",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        Container(
+          color: Colors.grey[300],
+          padding: EdgeInsets.all(8.0),
+          child: Wrap(
+            spacing: 8.0,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                "비교 결과: ${compareResults.length} cases",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        const Text("비교 결과:"),
-        SizedBox(
-          height: 200,
-          child: ListView.builder(
+        Expanded(
+          child: ListView.separated(
+            separatorBuilder: (context, index) { return const Divider(); },
             itemCount: compareResults.length,
             itemBuilder: (context, index) {
               final res = compareResults[index];
-              return ListTile(
-                leading: Icon(Icons.insert_drive_file),
-                title: Text(res.relativePath),
-                subtitle: Text(res.status +
-                    (res.leftSize != null ? " / 왼쪽: ${res.leftSize} bytes" : "") +
-                    (res.rightSize != null ? " / 오른쪽: ${res.rightSize} bytes" : "")),
+              Color tileColor;
+              switch (res.status) {
+                case CompareStatus.same:
+                  tileColor = Color(0xffe6ffe6);
+                  break;
+                case CompareStatus.diffSize:
+                  tileColor = Color(0xffffe6e6);
+                  break;
+                case CompareStatus.diffHash:
+                  tileColor = Color(0xffffe6e6);
+                  break;
+                case CompareStatus.onlyLeft:
+                  tileColor = Colors.transparent;
+                  break;
+                case CompareStatus.onlyRight:
+                  tileColor = Colors.transparent;
+                  break;
+              }
+
+              Widget leftTile = ((res.status == CompareStatus.onlyRight)
+                ? Expanded(child: Container())
+                : Expanded(
+                  child: Container(
+                    color: tileColor,
+                    child: ListTile(
+                      leading: Icon(Icons.insert_drive_file),
+                      title: Text(res.relativePath),
+                      subtitle: Text('${res.leftSize} bytes'),
+                    ),
+                  ),
+                )
               );
+              Widget rightTile = ((res.status == CompareStatus.onlyLeft)
+                ? Expanded(child: Container())
+                : Expanded(
+                  child: Container(
+                    color: tileColor,
+                    child: ListTile(
+                      title: Text(res.relativePath, textAlign: TextAlign.right),
+                      subtitle: Text('${res.rightSize} bytes', textAlign: TextAlign.right),
+                      trailing: Icon(Icons.insert_drive_file),
+                    ),
+                  ),
+                )
+              );
+
+              return Row(children: [leftTile, rightTile]);
             },
           ),
         ),
-      ],
+      ]
     );
   }
 
