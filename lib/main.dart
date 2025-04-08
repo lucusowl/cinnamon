@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as pathlib;
 
@@ -34,8 +35,9 @@ enum CompareStatus {
   onlyRight,  // 오른쪽에만 있음
 }
 class CompareResult {
-  final String relativePath;
   final CompareStatus status;
+  final String? leftRelativePath;
+  final String? rightRelativePath;
   final String? leftFullPath;
   final String? rightFullPath;
   final int? leftSize;
@@ -44,8 +46,9 @@ class CompareResult {
   final String? rightHash;
 
   CompareResult({
-    required this.relativePath,
     required this.status,
+    this.leftRelativePath,
+    this.rightRelativePath,
     this.leftFullPath,
     this.rightFullPath,
     this.leftSize,
@@ -347,8 +350,9 @@ class _FileComparePageState extends State<FileComparePage> {
         // 1. 파일 크기 비교
         if (leftItem.fileSize != rightItem.fileSize) {
           results.add(CompareResult(
-            relativePath: key,
             status: CompareStatus.diffSize,
+            leftRelativePath: leftItem.relativePath,
+            rightRelativePath: rightItem.relativePath,
             leftFullPath: leftItem.fullPath,
             rightFullPath: rightItem.fullPath,
             leftSize: leftItem.fileSize,
@@ -360,8 +364,9 @@ class _FileComparePageState extends State<FileComparePage> {
           final rightHash = await calculateHash(rightItem.fullPath);
           if (leftHash == rightHash) {
             results.add(CompareResult(
-              relativePath: key,
               status: CompareStatus.same,
+              leftRelativePath: leftItem.relativePath,
+              rightRelativePath: rightItem.relativePath,
               leftFullPath: leftItem.fullPath,
               rightFullPath: rightItem.fullPath,
               leftSize: leftItem.fileSize,
@@ -371,8 +376,9 @@ class _FileComparePageState extends State<FileComparePage> {
             ));
           } else {
             results.add(CompareResult(
-              relativePath: key,
               status: CompareStatus.diffHash,
+              leftRelativePath: leftItem.relativePath,
+              rightRelativePath: rightItem.relativePath,
               leftFullPath: leftItem.fullPath,
               rightFullPath: rightItem.fullPath,
               leftSize: leftItem.fileSize,
@@ -384,15 +390,15 @@ class _FileComparePageState extends State<FileComparePage> {
         }
       } else if (leftItem != null && rightItem == null) {
         results.add(CompareResult(
-          relativePath: key,
           status: CompareStatus.onlyLeft,
+          leftRelativePath: leftItem.relativePath,
           leftFullPath: leftItem.fullPath,
           leftSize: leftItem.fileSize,
         ));
       } else if (leftItem == null && rightItem != null) {
         results.add(CompareResult(
-          relativePath: key,
           status: CompareStatus.onlyRight,
+          rightRelativePath: rightItem.relativePath,
           rightFullPath: rightItem.fullPath,
           rightSize: rightItem.fileSize,
         ));
@@ -402,11 +408,49 @@ class _FileComparePageState extends State<FileComparePage> {
   }
 
   /// 비교 프로세스 B: 파일 크기로 필터링 후 해시 비교
-  /// 알고리즘 일단 현재 미구현
-  /// 비교 프로세스 A와 다르게 경로-이름과는 무관하게 크기가 같은 파일이 있다면 동일한 지 조사함
-  /// 결과상태: 동일, 왼쪽만 존재, 오른쪽만 존재
   Future<List<CompareResult>> _compareFilesWithSize(List<FileItem> left, List<FileItem> right) async {
+    // 각각을 file Size를 key로 하는 맵으로 변환합니다.
+    Map<int, List<FileItem>> leftGroups = {};
+    Map<int, List<FileItem>> rightGroups = {};
+    for (var file in left) {
+      leftGroups.putIfAbsent(file.fileSize, () => []).add(file);
+    }
+    for (var file in right) {
+      rightGroups.putIfAbsent(file.fileSize, () => []).add(file);
+    }
+
     List<CompareResult> results = [];
+
+    for (var size in leftGroups.keys) {
+      if(!rightGroups.containsKey(size)) continue; // 왼쪽만 있음
+      List<FileItem> leftGroup = leftGroups[size]!;
+      List<FileItem> rightGroup = rightGroups[size]!;
+
+      Map<String, FileItem> leftHashes = {};
+      for (var leftItem in leftGroup) {
+        String hash = await compute(calculateHash, leftItem.fullPath);
+        leftHashes[hash] = leftItem;
+      }
+      for (var rightItem in rightGroup) {
+        String hash = await compute(calculateHash, rightItem.fullPath);
+        if (leftHashes.containsKey(hash)) {
+          // 동일한 파일 존재
+          // 이름만 다르지 동일한 내용을 가질 수도 있음
+          final leftItem = leftHashes[hash]!;
+          results.add(CompareResult(
+            status: CompareStatus.same,
+            leftRelativePath: leftItem.relativePath,
+            rightRelativePath: rightItem.relativePath,
+            leftFullPath: leftItem.fullPath,
+            rightFullPath: rightItem.fullPath,
+            leftSize: leftItem.fileSize,
+            rightSize: rightItem.fileSize,
+            leftHash: hash,
+            rightHash: hash,
+          ));
+        }
+      }
+    }
     return results;
   }
 
@@ -461,7 +505,7 @@ class _FileComparePageState extends State<FileComparePage> {
                     color: tileColor,
                     child: ListTile(
                       leading: Icon(Icons.insert_drive_file),
-                      title: Text(res.relativePath),
+                      title: Text(res.leftRelativePath ?? '[NO NAME]'),
                       subtitle: Text('${res.leftSize} bytes'),
                     ),
                   ),
@@ -473,7 +517,7 @@ class _FileComparePageState extends State<FileComparePage> {
                   child: Container(
                     color: tileColor,
                     child: ListTile(
-                      title: Text(res.relativePath, textAlign: TextAlign.right),
+                      title: Text(res.rightRelativePath ?? '[NO NAME]', textAlign: TextAlign.right),
                       subtitle: Text('${res.rightSize} bytes', textAlign: TextAlign.right),
                       trailing: Icon(Icons.insert_drive_file),
                     ),
