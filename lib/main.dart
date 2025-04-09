@@ -362,7 +362,7 @@ class _FileComparePageState extends State<FileComparePage> {
   /// 버튼 클릭시 비교전 목록 유지
   Future<void> _onButtonBack() async {
     if (!comparisonDone) {
-      // 경고
+      _showAlert("비 정상적인 접근입니다.\n비교 이후 다시 시도 해주세요.");
       return;
     }
     setState(() {
@@ -372,8 +372,9 @@ class _FileComparePageState extends State<FileComparePage> {
   }
   /// 버튼 클릭시 비교전 목록 초기화
   Future<void> _onButtonReset() async {
+    if (!await _showConfirm("정말로 모든 목록을 초기화하시겠습니까?")) return;
     if (!comparisonDone) {
-      // 경고
+      _showAlert("비 정상적인 접근입니다.\n비교 이후 다시 시도 해주세요.");
       return;
     }
     setState(() {
@@ -604,8 +605,8 @@ class _FileComparePageState extends State<FileComparePage> {
   }
 
   /// 경고 메시지 출력
-  void _showAlert(String message) {
-    showDialog(
+  Future<void> _showAlert(String message) async {
+    await showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -613,14 +614,35 @@ class _FileComparePageState extends State<FileComparePage> {
           content: Text(message),
           actions: [
             TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text("확인"))
+              onPressed: () {Navigator.of(context).pop();},
+              child: const Text("확인"),
+            ),
           ],
         );
       }
     );
+  }
+  /// 경고 확인 메세지 출력
+  Future<bool> _showConfirm(String message) async {
+    final bool? result = await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {Navigator.of(context).pop(true);},
+              child: const Text("확인"),
+            ),
+            TextButton(
+              onPressed: () {Navigator.of(context).pop();},
+              child: const Text("취소"),
+            )
+          ],
+        );
+      }
+    );
+    return (result == true);
   }
 }
 
