@@ -10,6 +10,7 @@ class FileItem {
   final String fullPath;
   final String fileName;
   final int fileSize;
+  final DateTime accessed;
   final DateTime modified;
   final String relativePath; // 드롭 시 기준 폴더로부터의 상대경로
 
@@ -17,6 +18,7 @@ class FileItem {
     required this.fullPath,
     required this.fileName,
     required this.fileSize,
+    required this.accessed,
     required this.modified,
     required this.relativePath,
   });
@@ -36,25 +38,17 @@ enum CompareStatus {
 }
 class CompareResult {
   final CompareStatus status;
-  final String? leftRelativePath;
-  final String? rightRelativePath;
-  final String? leftFullPath;
-  final String? rightFullPath;
-  final int? leftSize;
-  final int? rightSize;
   final String? leftHash;
   final String? rightHash;
+  final FileItem? leftItem;
+  final FileItem? rightItem;
 
   CompareResult({
     required this.status,
-    this.leftRelativePath,
-    this.rightRelativePath,
-    this.leftFullPath,
-    this.rightFullPath,
-    this.leftSize,
-    this.rightSize,
     this.leftHash,
     this.rightHash,
+    this.leftItem,
+    this.rightItem,
   });
 }
 
@@ -207,10 +201,10 @@ class _FileComparePageState extends State<FileComparePage> {
               height: 50,
               child: (isComparing)
                 ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _onButtonPressed,
+                  : ElevatedButton(
+                      onPressed: _onButtonPressed,
                     child: Text(comparisonDone ? "Reset List" : "Compare Start"),
-                  ),
+                    ),
             ),
           ),
         ],
@@ -237,6 +231,7 @@ class _FileComparePageState extends State<FileComparePage> {
                 fullPath: entity.path,
                 fileName: entity.uri.pathSegments.last,
                 fileSize: stat.size,
+                accessed: stat.accessed,
                 modified: stat.modified,
                 relativePath: pathlib.relative(entity.path, from: path),
               );
@@ -255,8 +250,9 @@ class _FileComparePageState extends State<FileComparePage> {
           var stat = await File(path).stat();
           final newFileItem = FileItem(
             fullPath: path,
-            fileName: path.split(Platform.pathSeparator).last,
+            fileName: pathlib.basename(path),
             fileSize: stat.size,
+            accessed: stat.accessed,
             modified: stat.modified,
             relativePath: pathlib.relative(path, from: pathlib.dirname(path)),
           );
@@ -314,12 +310,11 @@ class _FileComparePageState extends State<FileComparePage> {
               itemBuilder: (context, index) {
                 FileItem item = files[index];
                 return Tooltip(
-                  message: item.relativePath,
+                  message: '${item.relativePath}\nAccessed: ${item.accessed}\nModified: ${item.modified}',
                   child: ListTile(
                     leading: Icon(Icons.insert_drive_file),
                     title: Text(item.fileName),
-                    subtitle: Text(
-                        'Modified: ${item.modified}\nSize: ${item.fileSize} bytes'),
+                    subtitle: Text('${item.fileSize} bytes'),
                   ),
                 );
               },
@@ -384,12 +379,8 @@ class _FileComparePageState extends State<FileComparePage> {
         if (leftItem.fileSize != rightItem.fileSize) {
           results.add(CompareResult(
             status: CompareStatus.diffSize,
-            leftRelativePath: leftItem.relativePath,
-            rightRelativePath: rightItem.relativePath,
-            leftFullPath: leftItem.fullPath,
-            rightFullPath: rightItem.fullPath,
-            leftSize: leftItem.fileSize,
-            rightSize: rightItem.fileSize,
+            leftItem: leftItem,
+            rightItem: rightItem,
           ));
         } else {
           // 2. MD5 해시 비교 (크기가 동일한 경우)
@@ -398,42 +389,30 @@ class _FileComparePageState extends State<FileComparePage> {
           if (leftHash == rightHash) {
             results.add(CompareResult(
               status: CompareStatus.same,
-              leftRelativePath: leftItem.relativePath,
-              rightRelativePath: rightItem.relativePath,
-              leftFullPath: leftItem.fullPath,
-              rightFullPath: rightItem.fullPath,
-              leftSize: leftItem.fileSize,
-              rightSize: rightItem.fileSize,
               leftHash: leftHash,
               rightHash: rightHash,
+              leftItem: leftItem,
+              rightItem: rightItem,
             ));
           } else {
             results.add(CompareResult(
               status: CompareStatus.diffHash,
-              leftRelativePath: leftItem.relativePath,
-              rightRelativePath: rightItem.relativePath,
-              leftFullPath: leftItem.fullPath,
-              rightFullPath: rightItem.fullPath,
-              leftSize: leftItem.fileSize,
-              rightSize: rightItem.fileSize,
               leftHash: leftHash,
               rightHash: rightHash,
+              leftItem: leftItem,
+              rightItem: rightItem,
             ));
           }
         }
       } else if (leftItem != null && rightItem == null) {
         results.add(CompareResult(
           status: CompareStatus.onlyLeft,
-          leftRelativePath: leftItem.relativePath,
-          leftFullPath: leftItem.fullPath,
-          leftSize: leftItem.fileSize,
+          leftItem: leftItem,
         ));
       } else if (leftItem == null && rightItem != null) {
         results.add(CompareResult(
           status: CompareStatus.onlyRight,
-          rightRelativePath: rightItem.relativePath,
-          rightFullPath: rightItem.fullPath,
-          rightSize: rightItem.fileSize,
+          rightItem: rightItem,
         ));
       }
     }
@@ -472,14 +451,10 @@ class _FileComparePageState extends State<FileComparePage> {
           final leftItem = leftHashes[hash]!;
           results.add(CompareResult(
             status: CompareStatus.same,
-            leftRelativePath: leftItem.relativePath,
-            rightRelativePath: rightItem.relativePath,
-            leftFullPath: leftItem.fullPath,
-            rightFullPath: rightItem.fullPath,
-            leftSize: leftItem.fileSize,
-            rightSize: rightItem.fileSize,
             leftHash: hash,
             rightHash: hash,
+            leftItem: leftItem,
+            rightItem: rightItem,
           ));
         }
       }
@@ -534,12 +509,12 @@ class _FileComparePageState extends State<FileComparePage> {
               Widget leftTile = ((res.status == CompareStatus.onlyRight)
                 ? Expanded(child: Container())
                 : Expanded(
-                  child: Container(
-                    color: tileColor,
+                  child: Tooltip(
+                    message: '${res.leftItem!.relativePath}\nAccessed: ${res.leftItem!.accessed}\nModified: ${res.leftItem!.modified}',
                     child: ListTile(
                       leading: Icon(Icons.insert_drive_file),
-                      title: Text(res.leftRelativePath ?? '[NO NAME]'),
-                      subtitle: Text('${res.leftSize} bytes'),
+                      title: Text(res.leftItem!.fileName),
+                      subtitle: Text('${res.leftItem!.fileSize} bytes'),
                     ),
                   ),
                 )
@@ -547,18 +522,21 @@ class _FileComparePageState extends State<FileComparePage> {
               Widget rightTile = ((res.status == CompareStatus.onlyLeft)
                 ? Expanded(child: Container())
                 : Expanded(
-                  child: Container(
-                    color: tileColor,
+                  child: Tooltip(
+                    message: '${res.rightItem!.relativePath}\nAccessed: ${res.rightItem!.accessed}\nModified: ${res.rightItem!.modified}',
                     child: ListTile(
-                      title: Text(res.rightRelativePath ?? '[NO NAME]', textAlign: TextAlign.right),
-                      subtitle: Text('${res.rightSize} bytes', textAlign: TextAlign.right),
+                      title: Text(res.rightItem!.fileName, textAlign: TextAlign.right),
+                      subtitle: Text('${res.rightItem!.fileSize} bytes', textAlign: TextAlign.right),
                       trailing: Icon(Icons.insert_drive_file),
                     ),
                   ),
                 )
               );
 
-              return Row(children: [leftTile, rightTile]);
+              return Container(
+                color: tileColor,
+                child: Row(children: [leftTile, rightTile])
+              );
             },
           ),
         ),
