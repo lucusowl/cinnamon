@@ -196,16 +196,51 @@ class _FileComparePageState extends State<FileComparePage> {
           // 비교 버튼 및 결과 표시
           Padding(
             padding: const EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 16.0),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: (isComparing)
-                ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _onButtonPressed,
-                    child: Text(comparisonDone ? "Reset List" : "Compare Start"),
-                    ),
-            ),
+            child: (isComparing)
+              ? const CircularProgressIndicator() // 비교 중
+              : (comparisonDone)
+                ? Column( // After 비교 - 결과 출력
+                    spacing: 8.0,
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _onButtonBack,
+                          child: Text("돌아가기"),
+                        )
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _onButtonReset,
+                          child: Text("초기화"),
+                        )
+                      ),
+                    ],
+                  )
+                : Column( // Before 비교
+                    spacing: 8.0,
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _onButtonCompareWithPath,
+                          child: Text("경로 기반 비교"),
+                        ),
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _onButtonCompareWithSize,
+                          child: Text("동일 파일 조사"),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -324,39 +359,63 @@ class _FileComparePageState extends State<FileComparePage> {
     );
   }
 
-  /// 버튼 클릭시 비교 수행 또는 목록 리셋
-  Future<void> _onButtonPressed() async {
-    if (comparisonDone) {
-      // Reset List: 양쪽 파일 목록 초기화
-      setState(() {
-        leftFiles.clear();
-        rightFiles.clear();
-        compareResults.clear();
-        comparisonDone = false;
-      });
-    } else {
-      // Compare Start: 양쪽에 파일이 있는지 확인
-      if (leftFiles.isEmpty || rightFiles.isEmpty) {
-        _showAlert("양쪽 모두 업로드해주세요.");
-        return;
-      }
-      setState(() {
-        isComparing = true;
-      });
-      final results = await _compareFilesWithPath(leftFiles, rightFiles);
-      setState(() {
-        compareResults = results;
-        isComparing = false;
-        comparisonDone = true;
-      });
+  /// 버튼 클릭시 비교전 목록 유지
+  Future<void> _onButtonBack() async {
+    if (!comparisonDone) {
+      // 경고
+      return;
     }
+    setState(() {
+      compareResults.clear();
+      comparisonDone = false;
+    });
+  }
+  /// 버튼 클릭시 비교전 목록 초기화
+  Future<void> _onButtonReset() async {
+    if (!comparisonDone) {
+      // 경고
+      return;
+    }
+    setState(() {
+      leftFiles.clear();
+      rightFiles.clear();
+      compareResults.clear();
+      comparisonDone = false;
+    });
+  }
+  /// 버튼 클릭시 비교 수행, 경로 기반 비교
+  Future<void> _onButtonCompareWithPath() async {
+    if (leftFiles.isEmpty || rightFiles.isEmpty) {
+      _showAlert("양쪽 모두 업로드해주세요.");
+      return;
+    }
+    setState(() {
+      isComparing = true;
+    });
+    final results = await _compareFilesWithPath(leftFiles, rightFiles);
+    setState(() {
+      compareResults = results;
+      isComparing = false;
+      comparisonDone = true;
+    });
+  }
+  /// 버튼 클릭시 비교 수행, 동일 파일 조사
+  Future<void> _onButtonCompareWithSize() async {
+    if (leftFiles.isEmpty || rightFiles.isEmpty) {
+      _showAlert("양쪽 모두 업로드해주세요.");
+      return;
+    }
+    setState(() {
+      isComparing = true;
+    });
+    final results = await _compareFilesWithSize(leftFiles, rightFiles);
+    setState(() {
+      compareResults = results;
+      isComparing = false;
+      comparisonDone = true;
+    });
   }
 
-  /// isolate에서 호출할 해시 계산 함수 (동기적으로 파일을 읽어 MD5 해시를 계산)
-  Future<String> _calculateHash(String filePath) async {
-    final bytes = File(filePath).readAsBytesSync();
-    return md5.convert(bytes).toString();
-  }
   /// 비교 프로세스 A: relativePath를 기반으로 필터링 후 해시 비교
   Future<List<CompareResult>> _compareFilesWithPath(List<FileItem> left, List<FileItem> right) async {
     // 각각을 relativePath를 key로 하는 맵으로 변환합니다.
@@ -563,4 +622,10 @@ class _FileComparePageState extends State<FileComparePage> {
       }
     );
   }
+}
+
+/// isolate에서 호출할 해시 계산 함수 (동기적으로 파일을 읽어 MD5 해시를 계산)
+Future<String> _calculateHash(String filePath) async {
+  final bytes = File(filePath).readAsBytesSync();
+  return md5.convert(bytes).toString();
 }
