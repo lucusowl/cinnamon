@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as pathlib;
 
@@ -28,7 +27,11 @@ class FileItem {
     return "$fileName ($relativePath)";
   }
 }
-
+enum CompareMode {
+  none, // 비교 아님
+  path, // 경로 기반
+  all,  // 전체 대상
+}
 enum CompareStatus {
   same,       // 동일
   diffSize,   // 다름(크기)
@@ -102,6 +105,7 @@ class _FileComparePageState extends State<FileComparePage> {
 
   // 비교 후 결과 메시지(비교 과정 및 결과)
   List<CompareResult> compareResults = [];
+  CompareMode compareMode = CompareMode.none;
 
   // 버튼 상태 : 비교 후에는 "reset list" 버튼으로 변경
   bool isComparing = false;
@@ -389,6 +393,7 @@ class _FileComparePageState extends State<FileComparePage> {
     }
     setState(() {
       compareResults.clear();
+      compareMode = CompareMode.none;
       comparisonDone = false;
     });
   }
@@ -403,6 +408,7 @@ class _FileComparePageState extends State<FileComparePage> {
       leftFiles.clear();
       rightFiles.clear();
       compareResults.clear();
+      compareMode = CompareMode.none;
       comparisonDone = false;
     });
   }
@@ -414,6 +420,7 @@ class _FileComparePageState extends State<FileComparePage> {
     }
     setState(() {
       isComparing = true;
+      compareMode = CompareMode.path;
     });
     final results = await _compareFilesWithPath(leftFiles, rightFiles);
     setState(() {
@@ -430,8 +437,9 @@ class _FileComparePageState extends State<FileComparePage> {
     }
     setState(() {
       isComparing = true;
+      compareMode = CompareMode.all;
     });
-    final results = await _compareFilesWithSize(leftFiles, rightFiles);
+    final results = await _compareFilesWithAll(leftFiles, rightFiles);
     setState(() {
       compareResults = results;
       isComparing = false;
@@ -446,12 +454,8 @@ class _FileComparePageState extends State<FileComparePage> {
     Map<String, FileItem> rightMap = { for (var item in right) item.relativePath: item };
 
     // 모든 key의 집합
-    final allKeys = <String>{
-      ...leftMap.keys,
-      ...rightMap.keys,
-    };
-
-    List<CompareResult> results = [];
+    final Set<String> allKeys = {...leftMap.keys, ...rightMap.keys};
+    final List<CompareResult> results = [];
 
     for (String key in allKeys) {
       final leftItem = leftMap[key];
@@ -501,43 +505,89 @@ class _FileComparePageState extends State<FileComparePage> {
     return results;
   }
 
-  /// 비교 프로세스 B: 파일 크기로 필터링 후 해시 비교
-  Future<List<CompareResult>> _compareFilesWithSize(List<FileItem> left, List<FileItem> right) async {
-    // 각각을 file Size를 key로 하는 맵으로 변환합니다.
-    Map<int, List<FileItem>> leftGroups = {};
-    Map<int, List<FileItem>> rightGroups = {};
-    for (var file in left) {
-      leftGroups.putIfAbsent(file.fileSize, () => []).add(file);
+  /// 비교 프로세스 B: 전체 파일을 대상으로 해시 비교
+  Future<List<CompareResult>> _compareFilesWithAll(List<FileItem> left, List<FileItem> right) async {
+    // 그룹화: 해시값 -> 파일 목록
+    final Map<String, List<FileItem>> leftGroups = {};
+    final Map<String, List<FileItem>> rightGroups = {};
+    for (final file in left) {
+      final hash = await _calculateHash(file.fullPath);
+      leftGroups.putIfAbsent(hash, () => []).add(file);
     }
-    for (var file in right) {
-      rightGroups.putIfAbsent(file.fileSize, () => []).add(file);
+    for (final file in right) {
+      final hash = await _calculateHash(file.fullPath);
+      rightGroups.putIfAbsent(hash, () => []).add(file);
     }
 
-    List<CompareResult> results = [];
+    final Set<String> allHashes = {...leftGroups.keys, ...rightGroups.keys};
+    final List<CompareResult> results = [];
 
-    for (var size in leftGroups.keys) {
-      if(!rightGroups.containsKey(size)) continue; // 왼쪽만 있음
-      List<FileItem> leftGroup = leftGroups[size]!;
-      List<FileItem> rightGroup = rightGroups[size]!;
+    for (final hash in allHashes) {
+      final leftGroup = leftGroups[hash] ?? [];
+      final rightGroup = rightGroups[hash] ?? [];
 
-      Map<String, FileItem> leftHashes = {};
-      for (var leftItem in leftGroup) {
-        String hash = await compute(_calculateHash, leftItem.fullPath);
-        leftHashes[hash] = leftItem;
-      }
-      for (var rightItem in rightGroup) {
-        String hash = await compute(_calculateHash, rightItem.fullPath);
-        if (leftHashes.containsKey(hash)) {
-          // 동일한 파일 존재
-          // 이름만 다르지 동일한 내용을 가질 수도 있음
-          final leftItem = leftHashes[hash]!;
-          results.add(CompareResult(
-            status: CompareStatus.same,
-            leftHash: hash,
-            rightHash: hash,
-            leftItem: leftItem,
-            rightItem: rightItem,
-          ));
+      if (leftGroup.isEmpty) {
+        // 오른쪽에만 존재 (onlyRight)
+        for (FileItem item in rightGroup) {
+          results.add(
+            CompareResult(
+              status: CompareStatus.onlyRight,
+              rightHash: hash,
+              rightItem: item,
+            ),
+          );
+        }
+      } else if (rightGroup.isEmpty) {
+        // 왼쪽에만 존재 (onlyLeft)
+        for (FileItem item in leftGroup) {
+          results.add(
+            CompareResult(
+              status: CompareStatus.onlyLeft,
+              leftHash: hash,
+              leftItem: item,
+            ),
+          );
+        }
+      } else {
+        // 양쪽에 동일한 내용의 파일 존재 (same)
+        final minCount = leftGroup.length < rightGroup.length
+            ? leftGroup.length
+            : rightGroup.length;
+
+        // 공통 파일 (same)
+        for (int i = 0; i < minCount; i++) {
+          results.add(
+            CompareResult(
+              status: CompareStatus.same,
+              leftHash: hash,
+              rightHash: hash,
+              leftItem: leftGroup[i],
+              rightItem: rightGroup[i],
+            ),
+          );
+        }
+        // 남은 파일들, 위와 동일하지만 표시할 때 매칭이 없음
+        for (int i = minCount; i < leftGroup.length; i++) {
+          results.add(
+            CompareResult(
+              status: CompareStatus.same,
+              leftHash: hash,
+              rightHash: hash,
+              leftItem: leftGroup[i],
+              rightItem: null,
+            ),
+          );
+        }
+        for (int i = minCount; i < rightGroup.length; i++) {
+          results.add(
+            CompareResult(
+              status: CompareStatus.same,
+              leftHash: hash,
+              rightHash: hash,
+              leftItem: null,
+              rightItem: rightGroup[i],
+            ),
+          );
         }
       }
     }
@@ -567,7 +617,13 @@ class _FileComparePageState extends State<FileComparePage> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                "비교 결과: ${compareResults.length} cases\n(동일: ${statusCount[0]}개, 다름: ${statusCount[1]+statusCount[2]}개, 왼쪽만: ${statusCount[3]}개, 오른쪽만: ${statusCount[4]}개)",
+                "비교 결과: ${compareResults.length} cases"
+                "\n(동일: ${statusCount[0]}개, "
+                "${(compareMode == CompareMode.path)
+                  ? '다름: ${statusCount[1]+statusCount[2]}개, '
+                  : ''}"
+                "왼쪽만: ${statusCount[3]}개, "
+                "오른쪽만: ${statusCount[4]}개)",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -599,7 +655,7 @@ class _FileComparePageState extends State<FileComparePage> {
                   break;
               }
 
-              Widget leftTile = ((res.status == CompareStatus.onlyRight)
+              Widget leftTile = ((res.leftItem == null)
                 ? Expanded(child: Container())
                 : Expanded(
                   child: Tooltip(
@@ -612,7 +668,7 @@ class _FileComparePageState extends State<FileComparePage> {
                   ),
                 )
               );
-              Widget rightTile = ((res.status == CompareStatus.onlyLeft)
+              Widget rightTile = ((res.rightItem == null)
                 ? Expanded(child: Container())
                 : Expanded(
                   child: Tooltip(
