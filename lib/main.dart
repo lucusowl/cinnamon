@@ -545,6 +545,16 @@ class _FileComparePageState extends State<FileComparePage> {
 
   /// 비교 결과를 표시하는 위젯
   Widget _buildCompareResults() {
+    List<int> statusCount = [0,0,0,0,0];
+    for(CompareResult item in compareResults) {
+      switch (item.status) {
+        case CompareStatus.same:      statusCount[0]++; break;
+        case CompareStatus.diffSize:  statusCount[1]++; break;
+        case CompareStatus.diffHash:  statusCount[2]++; break;
+        case CompareStatus.onlyLeft:  statusCount[3]++; break;
+        case CompareStatus.onlyRight: statusCount[4]++; break;
+      }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -556,7 +566,7 @@ class _FileComparePageState extends State<FileComparePage> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                "비교 결과: ${compareResults.length} cases",
+                "비교 결과: ${compareResults.length} cases\n(동일: ${statusCount[0]}개, 다름: ${statusCount[1]+statusCount[2]}개, 왼쪽만: ${statusCount[3]}개, 오른쪽만: ${statusCount[4]}개)",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
