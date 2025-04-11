@@ -350,8 +350,9 @@ class _FileComparePageState extends State<FileComparePage> {
                   )
                 : ListView.separated(
                     separatorBuilder: (context, index) { return const Divider(height: 0); },
-                    itemCount: files.length,
+                    itemCount: files.length+1,
                     itemBuilder: (context, index) {
+                      if (index == files.length) { return const Divider(height: 0); } // 최 하단에 구분선
                       FileItem item = files[index];
                       return Tooltip(
                         message: '${item.relativePath}\nAccessed: ${item.accessed}\nModified: ${item.modified}',
@@ -575,8 +576,9 @@ class _FileComparePageState extends State<FileComparePage> {
         Expanded(
           child: ListView.separated(
             separatorBuilder: (context, index) { return const Divider(height: 0); },
-            itemCount: compareResults.length,
+            itemCount: compareResults.length+1,
             itemBuilder: (context, index) {
+              if (index == compareResults.length) { return const Divider(height: 0); } // 최 하단에 구분선
               final res = compareResults[index];
               Color tileColor;
               switch (res.status) {
@@ -626,7 +628,11 @@ class _FileComparePageState extends State<FileComparePage> {
 
               return Container(
                 color: tileColor,
-                child: Row(children: [leftTile, rightTile])
+                child: IntrinsicHeight(child: Row(children: [
+                  leftTile,
+                  const VerticalDivider(thickness: 1.0, indent: 5.0, endIndent: 5.0,),
+                  rightTile
+                ]))
               );
             },
           ),
