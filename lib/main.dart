@@ -85,6 +85,7 @@ extension AppColors on ColorScheme {
   Color get highlightSame => (brightness == Brightness.dark) ? const Color(0x2219ff19): const Color(0xffe6ffe6);
   Color get highlightDiff => (brightness == Brightness.dark) ? const Color(0x22ff1919): const Color(0xffffe6e6);
   Color get highlightOther => Colors.transparent;
+  Color get overlayBackground => (brightness == Brightness.dark) ? const Color(0x33ffffff): const Color(0x33000000);
 }
 
 class FileComparePage extends StatefulWidget {
@@ -109,6 +110,8 @@ class _FileComparePageState extends State<FileComparePage> {
   // drag-over 상태 표시용 (UI 개선)
   bool leftDragging = false;
   bool rightDragging = false;
+  bool isLeftDropping = false;
+  bool isRightDropping = false;
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +138,9 @@ class _FileComparePageState extends State<FileComparePage> {
                     Expanded(
                       child: DropTarget(
                         onDragDone: (details) async {
+                          setState(() { isLeftDropping = true; });
                           await _processDroppedItems(details.files, isLeft: true);
+                          setState(() { isLeftDropping = false; });
                         },
                         onDragEntered: (_) {
                           setState(() {
@@ -156,7 +161,7 @@ class _FileComparePageState extends State<FileComparePage> {
                                   : Theme.of(context).colorScheme.outlineVariant,
                                 width: 2.0),
                           ),
-                          child: _buildFileList(leftFiles, "Left Area"),
+                          child: _buildFileList(leftFiles, isLeft: true),
                         ),
                       ),
                     ),
@@ -164,7 +169,9 @@ class _FileComparePageState extends State<FileComparePage> {
                     Expanded(
                       child: DropTarget(
                         onDragDone: (details) async {
+                          setState(() { isRightDropping = true; });
                           await _processDroppedItems(details.files, isLeft: false);
+                          setState(() { isRightDropping = false; });
                         },
                         onDragEntered: (_) {
                           setState(() {
@@ -185,7 +192,7 @@ class _FileComparePageState extends State<FileComparePage> {
                                   : Theme.of(context).colorScheme.outlineVariant,
                                 width: 2.0),
                           ),
-                          child: _buildFileList(rightFiles, "Right Area"),
+                          child: _buildFileList(rightFiles, isLeft: false),
                         ),
                       ),
                     ),
@@ -236,7 +243,7 @@ class _FileComparePageState extends State<FileComparePage> {
                         height: 50,
                         child: ElevatedButton(
                           onPressed: _onButtonCompareWithSize,
-                          child: Text("동일 파일 조사"),
+                          child: Text("전체 파일 비교"),
                         ),
                       ),
                     ],
@@ -311,50 +318,64 @@ class _FileComparePageState extends State<FileComparePage> {
   }
 
   /// 좌측/우측 파일 목록을 보여주는 위젯
-  Widget _buildFileList(List<FileItem> files, String title) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildFileList(List<FileItem> files, {required bool isLeft}) {
+    return Stack(
       children: [
-        Container(
-          color: Theme.of(context).colorScheme.surfaceBright,
-          padding: EdgeInsets.all(8.0),
-          child: Wrap(
-            spacing: 8.0,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: () => setState(() {files.clear();}),
-                child: Text("Clear"),
-              ),
-              Text(
-                "${files.length} files",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: files.isEmpty
-            ? Container(
-                padding: EdgeInsets.all(8.0),
-                child: Text("여기에 파일 또는 디렉토리를 드래그하세요."),
-              )
-            : ListView.separated(
-            separatorBuilder: (context, index) { return const Divider(height: 0); },
-              itemCount: files.length,
-              itemBuilder: (context, index) {
-                FileItem item = files[index];
-                return Tooltip(
-                  message: '${item.relativePath}\nAccessed: ${item.accessed}\nModified: ${item.modified}',
-                  child: ListTile(
-                    leading: Icon(Icons.insert_drive_file),
-                    title: Text(item.fileName),
-                    subtitle: Text('${item.fileSize} bytes'),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              color: Theme.of(context).colorScheme.surfaceBright,
+              padding: EdgeInsets.all(8.0),
+              child: Wrap(
+                spacing: 8.0,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: () => setState(() {files.clear();}),
+                    child: Text("Clear"),
                   ),
-                );
-              },
+                  Text(
+                    "${files.length} files",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
+            Expanded(
+              child: (files.isEmpty)
+                ? Container(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text("여기에 파일 또는 디렉토리를 드래그하세요."),
+                  )
+                : ListView.separated(
+                    separatorBuilder: (context, index) { return const Divider(height: 0); },
+                    itemCount: files.length,
+                    itemBuilder: (context, index) {
+                      FileItem item = files[index];
+                      return Tooltip(
+                        message: '${item.relativePath}\nAccessed: ${item.accessed}\nModified: ${item.modified}',
+                        child: ListTile(
+                          leading: Icon(Icons.insert_drive_file),
+                          title: Text(item.fileName),
+                          subtitle: Text('${item.fileSize} bytes'),
+                        ),
+                      );
+                    },
+                  ),
+            ),
+          ],
         ),
+
+        // 파일이 업로드 되고 있는 동안에는 대기 표시
+        if ((isLeft && isLeftDropping) || (!isLeft && isRightDropping)) ...[
+          Positioned.fill(
+            child: Container(
+              color: Theme.of(context).colorScheme.overlayBackground,
+              child: const Center(child: CircularProgressIndicator(),),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -400,7 +421,7 @@ class _FileComparePageState extends State<FileComparePage> {
       comparisonDone = true;
     });
   }
-  /// 버튼 클릭시 비교 수행, 동일 파일 조사
+  /// 버튼 클릭시 비교 수행, 전체 파일 비교
   Future<void> _onButtonCompareWithSize() async {
     if (leftFiles.isEmpty || rightFiles.isEmpty) {
       _showAlert("양쪽 모두 업로드해주세요.");
