@@ -66,7 +66,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '파일 비교 툴',
+      title: 'Chamomile',
       home: FileComparePage(),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

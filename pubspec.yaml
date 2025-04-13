@@ -1,8 +1,8 @@
 name: chamomile
-description: "A new Flutter project."
+description: "파일 비교 도구. 이 프로젝트는 두 개의 디렉토리 또는 파일 목록을 비교하여 동일한 파일을 식별하고, 경로와 이름이 다르더라도 내용이 동일한 파일을 찾아내는 데 도움을 주는 데스크톱 애플리케이션을 개발합니다."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: 'github' # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -35,10 +35,10 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
-  # 
-  desktop_drop:
-  crypto:
-  path:
+  # Dependencies added directly
+  desktop_drop: ^0.5.0
+  crypto: ^3.0.6
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:

@@ -1,0 +1,13 @@
+This project includes third-party libraries:
+
+- desktop_drop
+  License: Apache-2.0
+  https://pub.dev/packages/desktop_drop
+
+- crypto
+  License: BSD-3-Clause
+  https://pub.dev/packages/crypto
+
+- path
+  License: BSD-3-Clause
+  https://pub.dev/packages/path
