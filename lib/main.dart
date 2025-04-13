@@ -422,12 +422,20 @@ class _FileComparePageState extends State<FileComparePage> {
       isComparing = true;
       compareMode = CompareMode.path;
     });
-    final results = await _compareFilesWithPath(leftFiles, rightFiles);
-    setState(() {
-      compareResults = results;
-      isComparing = false;
-      comparisonDone = true;
-    });
+    try {
+      final results = await _compareFilesWithPath(leftFiles, rightFiles);
+      setState(() {
+        compareResults = results;
+        isComparing = false;
+        comparisonDone = true;
+      });
+    } catch (e) {
+      _showAlert("비교 도중에 문제가 발생했습니다.\n$e");
+      setState(() {
+        isComparing = false;
+        comparisonDone = false;
+      });
+    }
   }
   /// 버튼 클릭시 비교 수행, 전체 파일 비교
   Future<void> _onButtonCompareWithSize() async {
@@ -439,12 +447,20 @@ class _FileComparePageState extends State<FileComparePage> {
       isComparing = true;
       compareMode = CompareMode.all;
     });
-    final results = await _compareFilesWithAll(leftFiles, rightFiles);
-    setState(() {
-      compareResults = results;
-      isComparing = false;
-      comparisonDone = true;
-    });
+    try {
+      final results = await _compareFilesWithAll(leftFiles, rightFiles);
+      setState(() {
+        compareResults = results;
+        isComparing = false;
+        comparisonDone = true;
+      });
+    } catch (e) {
+      _showAlert("비교 도중에 문제가 발생했습니다.\n$e");
+      setState(() {
+        isComparing = false;
+        comparisonDone = false;
+      });
+    }
   }
 
   /// 비교 프로세스 A: relativePath를 기반으로 필터링 후 해시 비교
