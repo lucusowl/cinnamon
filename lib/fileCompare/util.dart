@@ -6,12 +6,26 @@ Future<void> showAlert(BuildContext context, String message) async {
     context: context,
     builder: (context) {
       return AlertDialog(
-        title: const Text("주의"),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8.0))),
+        clipBehavior: Clip.hardEdge,
+        contentPadding: const EdgeInsets.all(32.0),
+        actionsPadding: EdgeInsets.zero,
         content: Text(message),
         actions: [
-          TextButton(
-            onPressed: () {Navigator.of(context).pop();},
-            child: const Text("확인"),
+          SizedBox(
+            width: double.infinity,
+            height: 40.0,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: ElevatedButton.icon(
+                  autofocus: true,
+                  onPressed: () {Navigator.of(context).pop();},
+                  icon: const Icon(Icons.check),
+                  label: const Text("확인"),
+                )),
+              ],
+            ),
           ),
         ],
       );
@@ -25,16 +39,32 @@ Future<bool> showConfirm(BuildContext context, String message) async {
     context: context,
     builder: (context) {
       return AlertDialog(
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8.0))),
+        clipBehavior: Clip.hardEdge,
+        contentPadding: const EdgeInsets.all(32.0),
+        actionsPadding: EdgeInsets.zero,
         content: Text(message),
         actions: [
-          TextButton(
-            onPressed: () {Navigator.of(context).pop(true);},
-            child: const Text("확인"),
+          SizedBox(
+            width: double.infinity,
+            height: 40.0,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: ElevatedButton.icon(
+                  onPressed: () {Navigator.of(context).pop();},
+                  icon: const Icon(Icons.cancel),
+                  label: const Text("취소"),
+                )),
+                Expanded(child: ElevatedButton.icon(
+                  autofocus: true,
+                  onPressed: () {Navigator.of(context).pop(true);},
+                  icon: const Icon(Icons.check),
+                  label: const Text("확인"),
+                )),
+              ],
+            ),
           ),
-          TextButton(
-            onPressed: () {Navigator.of(context).pop();},
-            child: const Text("취소"),
-          )
         ],
       );
     }

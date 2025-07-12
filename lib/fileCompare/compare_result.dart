@@ -338,7 +338,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
     return Column(children: [
       // 결과 목록 표시 공간
       Expanded(child: Container(
-        margin: EdgeInsets.all(8.0),
+        margin: const EdgeInsets.all(8.0),
         decoration: BoxDecoration(
           border: Border.all(
               color: Theme.of(context).colorScheme.outlineVariant,
@@ -347,31 +347,29 @@ class _CompareResultPageState extends State<CompareResultPage> {
         child: _buildCompareResults(),
       )),
       const Divider(height: 8, thickness: 2,),
-      // 비교 버튼 및 결과 표시
+      // Bottom Action Button Part
       Padding(
-        padding: const EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 16.0),
-        child: (isComparing)
-        ? const CircularProgressIndicator() // 비교 중
-        : Column( // After 비교 - 결과 출력
-          spacing: 8.0,
-          children: [
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _onButtonBack,
-                child: Text("돌아가기"),
-              )
+        padding: const EdgeInsets.all(8.0),
+        child: SizedBox(
+          height: 48.0,
+          child: (isComparing)
+          ? const CircularProgressIndicator() // 비교 중
+          : Row( // After 비교 - 결과 출력
+              spacing: 8.0,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: ElevatedButton.icon(
+                  onPressed: _onButtonBack,
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text("돌아가기")
+                )),
+                Expanded(child: ElevatedButton.icon(
+                  onPressed: _onButtonReset,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text("초기화"),
+                )),
+              ],
             ),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _onButtonReset,
-                child: Text("초기화"),
-              )
-            ),
-          ],
         ),
       ),
     ]);

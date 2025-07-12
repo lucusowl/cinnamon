@@ -13,7 +13,7 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Cinnamon',
-      home: FileCompareScreen(),
+      home: const FileCompareScreen(),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.amber,
@@ -22,7 +22,7 @@ class MainApp extends StatelessWidget {
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             elevation: 0.0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
           ),
         ),
       ),

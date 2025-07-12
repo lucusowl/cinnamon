@@ -27,7 +27,7 @@ class _FileCompareScreenState extends State<FileCompareScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('파일 비교'),
+        title: const Text('파일 비교'),
       ),
       body: (compareMode == CompareMode.none)
         ? ComparePreparePage(

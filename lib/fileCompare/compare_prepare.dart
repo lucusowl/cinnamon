@@ -195,93 +195,79 @@ class ComparePreparePageState extends State<ComparePreparePage> {
       Expanded(child: Row(
         children: [
           // 대조군 드롭 영역, Section0
-          Expanded(
-            child: DropTarget(
-              onDragDone: (details) async {
-                setState(() { isSection0Dropping = true; });
-                await _processDroppedItems(details.files, isControl: true);
-                setState(() { isSection0Dropping = false; });
-              },
-              onDragEntered: (_) {
-                setState(() {
-                  section0Dragging = true;
-                });
-              },
-              onDragExited: (_) {
-                setState(() {
-                  section0Dragging = false;
-                });
-              },
-              child: Container(
-                margin: EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                      color: section0Dragging
-                        ? Theme.of(context).colorScheme.outline
-                        : Theme.of(context).colorScheme.outlineVariant,
-                      width: 2.0),
-                ),
-                child: _buildFileList(controlGroup, isControl: true),
+          Expanded(child: DropTarget(
+            onDragDone: (details) async {
+              setState(() => isSection0Dropping = true);
+              await _processDroppedItems(details.files, isControl: true);
+              setState(() => isSection0Dropping = false);
+            },
+            onDragEntered: (_) {
+              setState(() => section0Dragging = true);
+            },
+            onDragExited: (_) {
+              setState(() => section0Dragging = false);
+            },
+            child: Container(
+              margin: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                border: Border.all(
+                    color: section0Dragging
+                      ? Theme.of(context).colorScheme.outline
+                      : Theme.of(context).colorScheme.outlineVariant,
+                    width: 2.0),
               ),
+              child: _buildFileList(controlGroup, isControl: true),
             ),
-          ),
+          )),
           // 비교군 드롭 영역, Section1
-          Expanded(
-            child: DropTarget(
-              onDragDone: (details) async {
-                setState(() { isSection1Dropping = true; });
-                await _processDroppedItems(details.files, isControl: false);
-                setState(() { isSection1Dropping = false; });
-              },
-              onDragEntered: (_) {
-                setState(() {
-                  section1Dragging = true;
-                });
-              },
-              onDragExited: (_) {
-                setState(() {
-                  section1Dragging = false;
-                });
-              },
-              child: Container(
-                margin: EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                      color: section1Dragging
-                        ? Theme.of(context).colorScheme.outline
-                        : Theme.of(context).colorScheme.outlineVariant,
-                      width: 2.0),
-                ),
-                child: _buildFileList(experimentalGroup, isControl: false),
+          Expanded(child: DropTarget(
+            onDragDone: (details) async {
+              setState(() => isSection1Dropping = true);
+              await _processDroppedItems(details.files, isControl: false);
+              setState(() => isSection1Dropping = false);
+            },
+            onDragEntered: (_) {
+              setState(() => section1Dragging = true);
+            },
+            onDragExited: (_) {
+              setState(() => section1Dragging = false);
+            },
+            child: Container(
+              margin: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                border: Border.all(
+                    color: section1Dragging
+                      ? Theme.of(context).colorScheme.outline
+                      : Theme.of(context).colorScheme.outlineVariant,
+                    width: 2.0),
               ),
+              child: _buildFileList(experimentalGroup, isControl: false),
             ),
-          ),
+          )),
         ],
       )),
       const Divider(height: 8, thickness: 2,),
-      // 비교 버튼 및 결과 표시
+      // Bottom Action Button Part
       Padding(
-        padding: const EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 16.0),
-        child: Column(
-          spacing: 8.0,
-          children: [
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
+        padding: const EdgeInsets.all(8.0),
+        child: SizedBox(
+          height: 48.0,
+          child: Row(
+            spacing: 8.0,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: ElevatedButton.icon(
                 onPressed: _onButtonCompareWithPath,
-                child: Text("경로 기반 비교"),
-              ),
-            ),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
+                icon: const Icon(Icons.manage_search),
+                label: const Text("경로 기반 비교")
+              )),
+              Expanded(child: ElevatedButton.icon(
                 onPressed: _onButtonCompareWithAll,
-                child: Text("중복 파일 검사"),
-              ),
-            ),
-          ],
+                icon: const Icon(Icons.search),
+                label: const Text("중복 파일 검사"),
+              )),
+            ],
+          ),
         ),
       ),
     ]);
