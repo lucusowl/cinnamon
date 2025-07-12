@@ -19,9 +19,9 @@ class FileCompareScreen extends StatefulWidget {
 class _FileCompareScreenState extends State<FileCompareScreen> {
   CompareMode compareMode = CompareMode.none;
 
-  // 좌측과 우측 파일 목록 저장
-  List<FileItem> leftFiles = [];
-  List<FileItem> rightFiles = [];
+  // 대조군과 실험군
+  List<FileItem> controlGroup = [];
+  List<FileItem> experimentalGroup = [];
 
   @override
   Widget build(BuildContext context) {
@@ -31,15 +31,15 @@ class _FileCompareScreenState extends State<FileCompareScreen> {
       ),
       body: (compareMode == CompareMode.none)
         ? ComparePreparePage(
-            leftFiles: leftFiles,
-            rightFiles: rightFiles,
+            controlGroup: controlGroup,
+            experimentalGroup: experimentalGroup,
             onCompareWithPath: () { setState(() => compareMode = CompareMode.path); },
             onCompareWithAll: () { setState(() => compareMode = CompareMode.all); },
           )
         : CompareResultPage(
             compareMode: compareMode,
-            leftFiles: leftFiles,
-            rightFiles: rightFiles,
+            controlGroup: controlGroup,
+            experimentalGroup: experimentalGroup,
             onBack: () { setState(() => compareMode = CompareMode.none); },
             onReset: () { setState(() => compareMode = CompareMode.none); },
           ),

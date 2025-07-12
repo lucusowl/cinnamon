@@ -12,15 +12,15 @@ extension AppColors on ColorScheme {
 }
 
 class ComparePreparePage extends StatefulWidget {
-  final List<FileItem> leftFiles;
-  final List<FileItem> rightFiles;
+  final List<FileItem> controlGroup;
+  final List<FileItem> experimentalGroup;
   final Function() onCompareWithPath;
   final Function() onCompareWithAll;
 
   const ComparePreparePage({
     super.key,
-    required this.leftFiles,
-    required this.rightFiles,
+    required this.controlGroup,
+    required this.experimentalGroup,
     required this.onCompareWithPath,
     required this.onCompareWithAll,
   });
@@ -30,25 +30,25 @@ class ComparePreparePage extends StatefulWidget {
 }
 
 class ComparePreparePageState extends State<ComparePreparePage> {
-  late final List<FileItem> leftFiles;
-  late final List<FileItem> rightFiles;
+  late final List<FileItem> controlGroup;
+  late final List<FileItem> experimentalGroup;
   // drag-over 상태 표시용 (UI 개선)
-  bool leftDragging = false;
-  bool rightDragging = false;
-  bool isLeftDropping = false;
-  bool isRightDropping = false;
+  bool section0Dragging = false;
+  bool section1Dragging = false;
+  bool isSection0Dropping = false;
+  bool isSection1Dropping = false;
 
   @override
   void initState() {
     super.initState();
-    leftFiles = widget.leftFiles;
-    rightFiles = widget.rightFiles;
+    controlGroup = widget.controlGroup;
+    experimentalGroup = widget.experimentalGroup;
   }
 
   /// 드롭된 URL(파일/디렉토리 경로)를 처리하여 파일 목록에 추가
-  Future<void> _processDroppedItems(List<DropItem> urls, {required bool isLeft}) async {
+  Future<void> _processDroppedItems(List<DropItem> urls, {required bool isControl}) async {
     List<FileItem> newFiles = [];
-    List<FileItem> targetFiles = (isLeft ? leftFiles: rightFiles);
+    List<FileItem> targetFiles = (isControl ? controlGroup: experimentalGroup);
     List<String> existingPaths = targetFiles.map((file) => file.relativePath).toList();
     List<FileItem> duplicateFiles = [];
     for (var uri in urls) {
@@ -108,8 +108,8 @@ class ComparePreparePageState extends State<ComparePreparePage> {
     });
   }
 
-  /// 좌측/우측 파일 목록을 보여주는 위젯
-  Widget _buildFileList(List<FileItem> files, {required bool isLeft}) {
+  /// 각 집단 파일 목록을 보여주는 위젯
+  Widget _buildFileList(List<FileItem> files, {required bool isControl}) {
     return Stack(
       children: [
         Column(
@@ -160,7 +160,7 @@ class ComparePreparePageState extends State<ComparePreparePage> {
         ),
 
         // 파일이 업로드 되고 있는 동안에는 대기 표시
-        if ((isLeft && isLeftDropping) || (!isLeft && isRightDropping)) ...[
+        if ((isControl && isSection0Dropping) || (!isControl && isSection1Dropping)) ...[
           Positioned.fill(
             child: Container(
               color: Theme.of(context).colorScheme.overlayBackground,
@@ -174,15 +174,15 @@ class ComparePreparePageState extends State<ComparePreparePage> {
 
   /// 버튼 클릭시 비교 수행, 경로 기반 비교
   Future<void> _onButtonCompareWithPath() async {
-    if (leftFiles.isEmpty || rightFiles.isEmpty) {
+    if (controlGroup.isEmpty || experimentalGroup.isEmpty) {
       showAlert(context, "양쪽 모두 업로드해주세요.");
       return;
     }
     widget.onCompareWithPath();
   }
-  /// 버튼 클릭시 비교 수행, 전체 파일 비교
+  /// 버튼 클릭시 비교 수행, 중복 파일 검사
   Future<void> _onButtonCompareWithAll() async {
-    if (leftFiles.isEmpty || rightFiles.isEmpty) {
+    if (controlGroup.isEmpty || experimentalGroup.isEmpty) {
       showAlert(context, "양쪽 모두 업로드해주세요.");
       return;
     }
@@ -194,65 +194,65 @@ class ComparePreparePageState extends State<ComparePreparePage> {
     return Column(children: [
       Expanded(child: Row(
         children: [
-          // 좌측 드롭 영역
+          // 대조군 드롭 영역, Section0
           Expanded(
             child: DropTarget(
               onDragDone: (details) async {
-                setState(() { isLeftDropping = true; });
-                await _processDroppedItems(details.files, isLeft: true);
-                setState(() { isLeftDropping = false; });
+                setState(() { isSection0Dropping = true; });
+                await _processDroppedItems(details.files, isControl: true);
+                setState(() { isSection0Dropping = false; });
               },
               onDragEntered: (_) {
                 setState(() {
-                  leftDragging = true;
+                  section0Dragging = true;
                 });
               },
               onDragExited: (_) {
                 setState(() {
-                  leftDragging = false;
+                  section0Dragging = false;
                 });
               },
               child: Container(
                 margin: EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   border: Border.all(
-                      color: leftDragging
+                      color: section0Dragging
                         ? Theme.of(context).colorScheme.outline
                         : Theme.of(context).colorScheme.outlineVariant,
                       width: 2.0),
                 ),
-                child: _buildFileList(leftFiles, isLeft: true),
+                child: _buildFileList(controlGroup, isControl: true),
               ),
             ),
           ),
-          // 우측 드롭 영역
+          // 비교군 드롭 영역, Section1
           Expanded(
             child: DropTarget(
               onDragDone: (details) async {
-                setState(() { isRightDropping = true; });
-                await _processDroppedItems(details.files, isLeft: false);
-                setState(() { isRightDropping = false; });
+                setState(() { isSection1Dropping = true; });
+                await _processDroppedItems(details.files, isControl: false);
+                setState(() { isSection1Dropping = false; });
               },
               onDragEntered: (_) {
                 setState(() {
-                  rightDragging = true;
+                  section1Dragging = true;
                 });
               },
               onDragExited: (_) {
                 setState(() {
-                  rightDragging = false;
+                  section1Dragging = false;
                 });
               },
               child: Container(
                 margin: EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   border: Border.all(
-                      color: rightDragging
+                      color: section1Dragging
                         ? Theme.of(context).colorScheme.outline
                         : Theme.of(context).colorScheme.outlineVariant,
                       width: 2.0),
                 ),
-                child: _buildFileList(rightFiles, isLeft: false),
+                child: _buildFileList(experimentalGroup, isControl: false),
               ),
             ),
           ),
@@ -278,7 +278,7 @@ class ComparePreparePageState extends State<ComparePreparePage> {
               height: 50,
               child: ElevatedButton(
                 onPressed: _onButtonCompareWithAll,
-                child: Text("전체 파일 비교"),
+                child: Text("중복 파일 검사"),
               ),
             ),
           ],

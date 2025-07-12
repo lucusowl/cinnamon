@@ -24,26 +24,26 @@ class FileItem {
 
 /// 비교 결과 상태값
 enum CompareStatus {
-  same,       // 동일
-  diffSize,   // 다름(크기)
-  diffHash,   // 다름(내용)
-  onlyLeft,   // 왼쪽에만 있음
-  onlyRight,  // 오른쪽에만 있음
+  same,             // 동일
+  diffSize,         // 다름(크기)
+  diffHash,         // 다름(내용)
+  onlyControl,      // 대조군에만 있음
+  onlyExperimental, // 실험군에만 있음
 }
 
 /// 비교 상세 결과 객체값
 class CompareResult {
   final CompareStatus status;
-  final String? leftHash;
-  final String? rightHash;
-  final FileItem? leftItem;
-  final FileItem? rightItem;
+  final String? controlGroupHash;
+  final String? experimentalGroupHash;
+  final FileItem? controlGroupItem;
+  final FileItem? experimentalGroupItem;
 
   CompareResult({
     required this.status,
-    this.leftHash,
-    this.rightHash,
-    this.leftItem,
-    this.rightItem,
+    this.controlGroupHash,
+    this.experimentalGroupHash,
+    this.controlGroupItem,
+    this.experimentalGroupItem,
   });
 }
