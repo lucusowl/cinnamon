@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:cinnamon/fileCompare/file_compare.dart';
 import 'package:cinnamon/fileCompare/model.dart';
 import 'package:cinnamon/fileCompare/util.dart';
 import 'package:crypto/crypto.dart';
@@ -13,16 +12,14 @@ extension AppColors on ColorScheme {
   Color get highlightOther => Colors.transparent;
 }
 
-class CompareResultPage extends StatefulWidget {
-  final CompareMode compareMode;
+class CompareResultPathPage extends StatefulWidget {
   final List<FileItem> controlGroup;
   final List<FileItem> experimentalGroup;
   final Function() onBack;
   final Function() onReset;
 
-  const CompareResultPage({
+  const CompareResultPathPage({
     super.key,
-    required this.compareMode,
     required this.controlGroup,
     required this.experimentalGroup,
     required this.onBack,
@@ -30,10 +27,10 @@ class CompareResultPage extends StatefulWidget {
   });
 
   @override
-  State<CompareResultPage> createState() => _CompareResultPageState();
+  State<CompareResultPathPage> createState() => _CompareResultPathPageState();
 }
 
-class _CompareResultPageState extends State<CompareResultPage> {
+class _CompareResultPathPageState extends State<CompareResultPathPage> {
   bool isComparing = false;
   late final List<FileItem> controlGroup;
   late final List<FileItem> experimentalGroup;
@@ -47,12 +44,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       setState(() => isComparing = true);
       try {
-        late final results;
-        if (widget.compareMode == CompareMode.path) {
-          results = await _compareFilesWithPath(controlGroup, experimentalGroup);
-        } else {
-          results = await _compareFilesWithAll(controlGroup, experimentalGroup);
-        }
+        final results = await _compareFilesWithPath(controlGroup, experimentalGroup);
         setState(() {
           compareResults = results;
           isComparing = false;
@@ -122,95 +114,6 @@ class _CompareResultPageState extends State<CompareResultPage> {
     return results;
   }
 
-  /// 비교 프로세스 B: 전체 파일을 대상으로 해시 비교
-  Future<List<CompareResult>> _compareFilesWithAll(List<FileItem> controlGroup, List<FileItem> experimentalGroup) async {
-    // 그룹화: 해시값 -> 파일 목록
-    final Map<String, List<FileItem>> controlGroupHashMap = {};
-    final Map<String, List<FileItem>> experimentalGroupHashMap = {};
-    for (final file in controlGroup) {
-      final hash = await _calculateHash(file.fullPath);
-      controlGroupHashMap.putIfAbsent(hash, () => []).add(file);
-    }
-    for (final file in experimentalGroup) {
-      final hash = await _calculateHash(file.fullPath);
-      experimentalGroupHashMap.putIfAbsent(hash, () => []).add(file);
-    }
-
-    final Set<String> allHashes = {...controlGroupHashMap.keys, ...experimentalGroupHashMap.keys};
-    final List<CompareResult> results = [];
-
-    for (final hash in allHashes) {
-      final controlGroupItems = controlGroupHashMap[hash] ?? [];
-      final experimentalGroupItems = experimentalGroupHashMap[hash] ?? [];
-
-      if (controlGroupItems.isEmpty) {
-        // 실험군에만 존재 (onlyExperimental)
-        for (FileItem item in experimentalGroupItems) {
-          results.add(
-            CompareResult(
-              status: CompareStatus.onlyExperimental,
-              experimentalGroupHash: hash,
-              experimentalGroupItem: item,
-            ),
-          );
-        }
-      } else if (experimentalGroupItems.isEmpty) {
-        // 대조군에만 존재 (onlyContorl)
-        for (FileItem item in controlGroupItems) {
-          results.add(
-            CompareResult(
-              status: CompareStatus.onlyControl,
-              controlGroupHash: hash,
-              controlGroupItem: item,
-            ),
-          );
-        }
-      } else {
-        // 양쪽에 동일한 내용의 파일 존재 (same)
-        final minCount = controlGroupItems.length < experimentalGroupItems.length
-            ? controlGroupItems.length
-            : experimentalGroupItems.length;
-
-        // 공통 파일 (same)
-        for (int i = 0; i < minCount; i++) {
-          results.add(
-            CompareResult(
-              status: CompareStatus.same,
-              controlGroupHash: hash,
-              experimentalGroupHash: hash,
-              controlGroupItem: controlGroupItems[i],
-              experimentalGroupItem: experimentalGroupItems[i],
-            ),
-          );
-        }
-        // 남은 파일들, 위와 동일하지만 표시할 때 매칭이 없음
-        for (int i = minCount; i < controlGroupItems.length; i++) {
-          results.add(
-            CompareResult(
-              status: CompareStatus.same,
-              controlGroupHash: hash,
-              experimentalGroupHash: hash,
-              controlGroupItem: controlGroupItems[i],
-              experimentalGroupItem: null,
-            ),
-          );
-        }
-        for (int i = minCount; i < experimentalGroupItems.length; i++) {
-          results.add(
-            CompareResult(
-              status: CompareStatus.same,
-              controlGroupHash: hash,
-              experimentalGroupHash: hash,
-              controlGroupItem: null,
-              experimentalGroupItem: experimentalGroupItems[i],
-            ),
-          );
-        }
-      }
-    }
-    return results;
-  }
-
   /// 버튼 클릭시 비교전 목록 유지
   Future<void> _onButtonBack() async {
     setState(() {
@@ -255,9 +158,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
               Text(
                 "비교 결과: ${compareResults.length} cases"
                 "\n(동일: ${statusCount[0]}개, "
-                "${(widget.compareMode == CompareMode.path)
-                  ? '다름: ${statusCount[1]+statusCount[2]}개, '
-                  : ''}"
+                "다름: ${statusCount[1]+statusCount[2]}개, "
                 "왼쪽만: ${statusCount[3]}개, "
                 "오른쪽만: ${statusCount[4]}개)",
                 style: TextStyle(fontWeight: FontWeight.bold),

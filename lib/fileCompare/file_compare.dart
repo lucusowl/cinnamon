@@ -1,5 +1,6 @@
 import 'package:cinnamon/fileCompare/compare_prepare.dart';
-import 'package:cinnamon/fileCompare/compare_result.dart';
+import 'package:cinnamon/fileCompare/compare_result_all.dart';
+import 'package:cinnamon/fileCompare/compare_result_path.dart';
 import 'package:cinnamon/fileCompare/model.dart';
 import 'package:flutter/material.dart';
 
@@ -25,24 +26,36 @@ class _FileCompareScreenState extends State<FileCompareScreen> {
 
   @override
   Widget build(BuildContext context) {
+    late final Widget mainBodyWidget;
+    switch (compareMode) {
+      case CompareMode.path:
+      mainBodyWidget = CompareResultPathPage(
+        controlGroup: controlGroup,
+        experimentalGroup: experimentalGroup,
+        onBack: () { setState(() => compareMode = CompareMode.none); },
+        onReset: () { setState(() => compareMode = CompareMode.none); },
+      );
+      break;
+      case CompareMode.all:
+      mainBodyWidget = CompareResultAllPage(
+        controlGroup: controlGroup,
+        experimentalGroup: experimentalGroup,
+        onBack: () { setState(() => compareMode = CompareMode.none); },
+        onReset: () { setState(() => compareMode = CompareMode.none); },
+      );
+      break;
+      case CompareMode.none:
+      mainBodyWidget = ComparePreparePage(
+        controlGroup: controlGroup,
+        experimentalGroup: experimentalGroup,
+        onCompareWithPath: () { setState(() => compareMode = CompareMode.path); },
+        onCompareWithAll: () { setState(() => compareMode = CompareMode.all); },
+      );
+      break;
+    }
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('파일 비교'),
-      ),
-      body: (compareMode == CompareMode.none)
-        ? ComparePreparePage(
-            controlGroup: controlGroup,
-            experimentalGroup: experimentalGroup,
-            onCompareWithPath: () { setState(() => compareMode = CompareMode.path); },
-            onCompareWithAll: () { setState(() => compareMode = CompareMode.all); },
-          )
-        : CompareResultPage(
-            compareMode: compareMode,
-            controlGroup: controlGroup,
-            experimentalGroup: experimentalGroup,
-            onBack: () { setState(() => compareMode = CompareMode.none); },
-            onReset: () { setState(() => compareMode = CompareMode.none); },
-          ),
+      appBar: AppBar(title: const Text('파일 비교')),
+      body: mainBodyWidget
     );
   }
 }
