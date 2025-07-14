@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cinnamon/fileCompare/model.dart';
 import 'package:cinnamon/fileCompare/util.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
@@ -252,8 +253,11 @@ class ComparePreparePageState extends State<ComparePreparePage> {
     if (mounted) {
       try {
         widget.onCompareWithPath();
+      } on FileException catch (e) {
+        // 변환도중 오류 발생
+        showAlert(context, "아래와 같은 에러가 발생했습니다.\n${e.message}");
       } catch (e) {
-        // 오류 발생시 처리표시 => 변환 포함
+        showAlert(context, "아래와 같은 예상치 못한 에러가 발생했습니다.\n$e");
       }
     }
   }
@@ -268,8 +272,11 @@ class ComparePreparePageState extends State<ComparePreparePage> {
     if (mounted) {
       try {
         widget.onCompareWithAll();
+      } on FileException catch (e) {
+        // 변환도중 오류 발생
+        showAlert(context, "아래와 같은 에러가 발생했습니다.\n${e.message}");
       } catch (e) {
-        // 오류 발생시 처리표시 => 변환 포함
+        showAlert(context, "아래와 같은 예상치 못한 에러가 발생했습니다.\n$e");
       }
     }
   }

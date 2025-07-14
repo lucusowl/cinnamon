@@ -46,3 +46,12 @@ class CompareResult {
     this.experimentalGroupItem,
   });
 }
+
+/// 예외처리용
+class FileException implements Exception {
+  final String message;
+  FileException(this.message);
+
+  @override
+  String toString() => 'FileException: $message';
+}

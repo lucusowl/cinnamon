@@ -61,8 +61,10 @@ class _FileCompareScreenState extends State<FileCompareScreen> {
         ));
       } else if (fileEntityType == FileSystemEntityType.notFound) {
         // 대상이 존재하지 않음
+        throw FileException('존재하지 않음: $path');
       } else {
-        // 적절하지 않은 파일 형식
+        // 부적절한 파일 형식
+        throw FileException('처리할 수 없는 파일 형식: $path');
       }
     }
     return buffer;
