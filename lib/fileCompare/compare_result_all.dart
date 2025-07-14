@@ -15,8 +15,8 @@ extension AppColors on ColorScheme {
 class CompareResultAllPage extends StatefulWidget {
   final List<FileItem> controlGroup;
   final List<FileItem> experimentalGroup;
-  final Function() onBack;
-  final Function() onReset;
+  final void Function() onBack;
+  final void Function() onReset;
 
   const CompareResultAllPage({
     super.key,
@@ -166,14 +166,13 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
 
   /// 비교 결과를 표시하는 위젯
   Widget _buildCompareResults() {
-    List<int> statusCount = [0,0,0,0,0];
+    List<int> statusCount = [0,0,0,0];
     for(CompareResult item in compareResults) {
       switch (item.status) {
         case CompareStatus.same:             statusCount[0]++; break;
-        case CompareStatus.diffSize:         statusCount[1]++; break;
-        case CompareStatus.diffHash:         statusCount[2]++; break;
-        case CompareStatus.onlyControl:      statusCount[3]++; break;
-        case CompareStatus.onlyExperimental: statusCount[4]++; break;
+        case CompareStatus.diff:             statusCount[1]++; break;
+        case CompareStatus.onlyControl:      statusCount[2]++; break;
+        case CompareStatus.onlyExperimental: statusCount[3]++; break;
       }
     }
     return Column(
@@ -187,10 +186,10 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                "비교 결과: ${compareResults.length} cases"
-                "\n(동일: ${statusCount[0]}개, "
-                "왼쪽만: ${statusCount[3]}개, "
-                "오른쪽만: ${statusCount[4]}개)",
+                "비교 결과: ${compareResults.length} cases\n"
+                "(동일: ${statusCount[0]}개, "
+                "왼쪽만: ${statusCount[2]}개, "
+                "오른쪽만: ${statusCount[3]}개)",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -208,10 +207,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
                 case CompareStatus.same:
                   tileColor = Theme.of(context).colorScheme.highlightSame;
                   break;
-                case CompareStatus.diffSize:
-                  tileColor = Theme.of(context).colorScheme.highlightDiff;
-                  break;
-                case CompareStatus.diffHash:
+                case CompareStatus.diff:
                   tileColor = Theme.of(context).colorScheme.highlightDiff;
                   break;
                 case CompareStatus.onlyControl:

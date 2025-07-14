@@ -15,8 +15,8 @@ extension AppColors on ColorScheme {
 class CompareResultPathPage extends StatefulWidget {
   final List<FileItem> controlGroup;
   final List<FileItem> experimentalGroup;
-  final Function() onBack;
-  final Function() onReset;
+  final void Function() onBack;
+  final void Function() onReset;
 
   const CompareResultPathPage({
     super.key,
@@ -73,7 +73,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
         // 1. 파일 크기 비교
         if (controlGroupItem.fileSize != experimentalGroupItem.fileSize) {
           results.add(CompareResult(
-            status: CompareStatus.diffSize,
+            status: CompareStatus.diff,
             controlGroupItem: controlGroupItem,
             experimentalGroupItem: experimentalGroupItem,
           ));
@@ -91,7 +91,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
             ));
           } else {
             results.add(CompareResult(
-              status: CompareStatus.diffHash,
+              status: CompareStatus.diff,
               controlGroupHash: controlGroupHash,
               experimentalGroupHash: experimentalGroupHash,
               controlGroupItem: controlGroupItem,
@@ -135,14 +135,13 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
 
   /// 비교 결과를 표시하는 위젯
   Widget _buildCompareResults() {
-    List<int> statusCount = [0,0,0,0,0];
+    List<int> statusCount = [0,0,0,0];
     for(CompareResult item in compareResults) {
       switch (item.status) {
         case CompareStatus.same:             statusCount[0]++; break;
-        case CompareStatus.diffSize:         statusCount[1]++; break;
-        case CompareStatus.diffHash:         statusCount[2]++; break;
-        case CompareStatus.onlyControl:      statusCount[3]++; break;
-        case CompareStatus.onlyExperimental: statusCount[4]++; break;
+        case CompareStatus.diff:             statusCount[1]++; break;
+        case CompareStatus.onlyControl:      statusCount[2]++; break;
+        case CompareStatus.onlyExperimental: statusCount[3]++; break;
       }
     }
     return Column(
@@ -156,11 +155,11 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                "비교 결과: ${compareResults.length} cases"
-                "\n(동일: ${statusCount[0]}개, "
-                "다름: ${statusCount[1]+statusCount[2]}개, "
-                "왼쪽만: ${statusCount[3]}개, "
-                "오른쪽만: ${statusCount[4]}개)",
+                "비교 결과: ${compareResults.length} cases\n"
+                "(동일: ${statusCount[0]}개, "
+                "다름: ${statusCount[1]}개, "
+                "왼쪽만: ${statusCount[2]}개, "
+                "오른쪽만: ${statusCount[3]}개)",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -178,10 +177,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                 case CompareStatus.same:
                   tileColor = Theme.of(context).colorScheme.highlightSame;
                   break;
-                case CompareStatus.diffSize:
-                  tileColor = Theme.of(context).colorScheme.highlightDiff;
-                  break;
-                case CompareStatus.diffHash:
+                case CompareStatus.diff:
                   tileColor = Theme.of(context).colorScheme.highlightDiff;
                   break;
                 case CompareStatus.onlyControl:

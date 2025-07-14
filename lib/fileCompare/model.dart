@@ -25,8 +25,7 @@ class FileItem {
 /// 비교 결과 상태값
 enum CompareStatus {
   same,             // 동일
-  diffSize,         // 다름(크기)
-  diffHash,         // 다름(내용)
+  diff,             // 다름
   onlyControl,      // 대조군에만 있음
   onlyExperimental, // 실험군에만 있음
 }
