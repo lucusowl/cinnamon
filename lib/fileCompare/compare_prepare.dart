@@ -299,15 +299,23 @@ class ComparePreparePageState extends State<ComparePreparePage> {
             spacing: 8.0,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: ElevatedButton.icon(
-                onPressed: _onButtonCompareWithPath,
-                icon: const Icon(Icons.manage_search),
-                label: const Text("경로 기반 비교")
+              Expanded(child: Tooltip(
+                message: '파일의 경로와 내용이 같아야 동일\n파일 경로는 상대경로(입력 위치가 최상위 경로)를 기준',
+                waitDuration: Duration(milliseconds: 500),
+                child: ElevatedButton.icon(
+                  onPressed: _onButtonCompareWithPath,
+                  icon: const Icon(Icons.manage_search),
+                  label: const Text("경로 기반 비교")
+                ),
               )),
-              Expanded(child: ElevatedButton.icon(
-                onPressed: _onButtonCompareWithAll,
-                icon: const Icon(Icons.search),
-                label: const Text("중복 파일 검사"),
+              Expanded(child: Tooltip(
+                message: '파일의 경로와 상관없이 내용만 같아도 동일',
+                waitDuration: Duration(milliseconds: 500),
+                child: ElevatedButton.icon(
+                  onPressed: _onButtonCompareWithAll,
+                  icon: const Icon(Icons.search),
+                  label: const Text("중복 파일 검사"),
+                ),
               )),
             ],
           ),
