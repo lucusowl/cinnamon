@@ -104,13 +104,23 @@ class _FileCompareScreenState extends State<FileCompareScreen> {
       mainBodyWidget = ComparePreparePage(
         pathGroupList: pathGroupList,
         onCompareWithPath: () async {
-          controlGroup = await _convertPathGroupToFileGroup(pathGroupList[0]);
-          experimentalGroup = await _convertPathGroupToFileGroup(pathGroupList[1]);
+          final sw = Stopwatch()..start();
+          await Future.wait([
+            _convertPathGroupToFileGroup(pathGroupList[0]).then((ret) => controlGroup = ret),
+            _convertPathGroupToFileGroup(pathGroupList[1]).then((ret) => experimentalGroup = ret),
+          ]);
+          sw.stop();
+          debugPrint('변환시간: ${sw.elapsed.toString()}');
           setState(() => compareMode = CompareMode.path);
         },
         onCompareWithAll: () async {
-          controlGroup = await _convertPathGroupToFileGroup(pathGroupList[0]);
-          experimentalGroup = await _convertPathGroupToFileGroup(pathGroupList[1]);
+          final sw = Stopwatch()..start();
+          await Future.wait([
+            _convertPathGroupToFileGroup(pathGroupList[0]).then((ret) => controlGroup = ret),
+            _convertPathGroupToFileGroup(pathGroupList[1]).then((ret) => experimentalGroup = ret),
+          ]);
+          sw.stop();
+          debugPrint('변환시간: ${sw.elapsed.toString()}');
           setState(() => compareMode = CompareMode.all);
         },
       );

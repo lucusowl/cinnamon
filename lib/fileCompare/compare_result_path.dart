@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:cinnamon/fileCompare/model.dart';
@@ -34,7 +35,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   bool isComparing = false;
   late final List<FileItem> controlGroup;
   late final List<FileItem> experimentalGroup;
-  List<CompareResult> compareResults = [];
+  final HashMap<String, CompareResult> resultHashMap = HashMap();
 
   @override
   void initState() {
@@ -44,11 +45,8 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       setState(() => isComparing = true);
       try {
-        final results = await _compareFilesWithPath(controlGroup, experimentalGroup);
-        setState(() {
-          compareResults = results;
-          isComparing = false;
-        });
+        await _compareWithPath(controlGroup, experimentalGroup);
+        setState(() => isComparing = false);
       } catch (e) {
         showAlert(context, "비교 도중에 문제가 발생했습니다.\n$e");
         setState(() => isComparing = false);
@@ -56,68 +54,64 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
     });
   }
 
-  /// 비교 프로세스 A: relativePath를 기반으로 필터링 후 해시 비교
-  Future<List<CompareResult>> _compareFilesWithPath(List<FileItem> controlGroup, List<FileItem> experimentalGroup) async {
-    // 각각을 relativePath를 key로 하는 맵으로 변환합니다.
-    Map<String, FileItem> controlGroupMap = { for (var item in controlGroup) item.relativePath: item };
-    Map<String, FileItem> experimentalGroupMap = { for (var item in experimentalGroup) item.relativePath: item };
+  /// 해시 계산 함수
+  Future<Digest> _calculateHash(String filePath) async {
+    final bytes = File(filePath).readAsBytesSync();
+    return md5.convert(bytes);
+  }
 
-    // 모든 key의 집합
-    final Set<String> allKeys = {...controlGroupMap.keys, ...experimentalGroupMap.keys};
-    final List<CompareResult> results = [];
-
-    for (String key in allKeys) {
-      final controlGroupItem = controlGroupMap[key];
-      final experimentalGroupItem = experimentalGroupMap[key];
-      if (controlGroupItem != null && experimentalGroupItem != null) {
-        // 1. 파일 크기 비교
-        if (controlGroupItem.fileSize != experimentalGroupItem.fileSize) {
-          results.add(CompareResult(
-            status: CompareStatus.diff,
-            controlGroupItem: controlGroupItem,
-            experimentalGroupItem: experimentalGroupItem,
-          ));
+  /// 비교 프로세스
+  Future<void> _compareWithPath(List<FileItem> controlGroup, List<FileItem> experimentalGroup) async {
+    final sw = Stopwatch()..start();
+    // 대조군 순회
+    for (final item in controlGroup) {
+      resultHashMap[item.relativePath] = CompareResult(
+        status: CompareStatus.onlyControl,
+        group0: item,
+        group1: null
+      );
+    }
+    // 실험군 순회
+    for (final item in experimentalGroup) {
+      CompareResult? existing = resultHashMap[item.relativePath];
+      if (existing == null) {
+        // 같은 경로 없음
+        resultHashMap[item.relativePath] = CompareResult(
+          status: CompareStatus.onlyExperimental,
+          group0: null,
+          group1: item
+        );
+      } else {
+        int tmpSize = existing.group0!.fileSize;
+        if (tmpSize != item.fileSize) {
+          // 파일 크기가 다름
+          existing.status = CompareStatus.diff;
+          existing.group1 = item;
         } else {
-          // 2. MD5 해시 비교 (크기가 동일한 경우)
-          final controlGroupHash = await _calculateHash(controlGroupItem.fullPath);
-          final experimentalGroupHash = await _calculateHash(experimentalGroupItem.fullPath);
-          if (controlGroupHash == experimentalGroupHash) {
-            results.add(CompareResult(
-              status: CompareStatus.same,
-              controlGroupHash: controlGroupHash,
-              experimentalGroupHash: experimentalGroupHash,
-              controlGroupItem: controlGroupItem,
-              experimentalGroupItem: experimentalGroupItem,
-            ));
+          final List<Digest> hashBuffer = await Future.wait([
+            _calculateHash(existing.group0!.fullPath),
+            _calculateHash(item.fullPath)
+          ]);
+          if (hashBuffer[0] != hashBuffer[1]) {
+            // 파일 내용도 다름
+            existing.status = CompareStatus.diff;
+            existing.group1 = item;
           } else {
-            results.add(CompareResult(
-              status: CompareStatus.diff,
-              controlGroupHash: controlGroupHash,
-              experimentalGroupHash: experimentalGroupHash,
-              controlGroupItem: controlGroupItem,
-              experimentalGroupItem: experimentalGroupItem,
-            ));
+            // 파일 내용이 같음
+            existing.status = CompareStatus.same;
+            existing.group1 = item;
           }
         }
-      } else if (controlGroupItem != null && experimentalGroupItem == null) {
-        results.add(CompareResult(
-          status: CompareStatus.onlyControl,
-          controlGroupItem: controlGroupItem,
-        ));
-      } else if (controlGroupItem == null && experimentalGroupItem != null) {
-        results.add(CompareResult(
-          status: CompareStatus.onlyExperimental,
-          experimentalGroupItem: experimentalGroupItem,
-        ));
       }
     }
-    return results;
+    sw.stop();
+    debugPrint('경과시간: ${sw.elapsed.toString()}');
   }
 
   /// 버튼 클릭시 비교전 목록 유지
   Future<void> _onButtonBack() async {
     setState(() {
-      compareResults.clear();
+      resultHashMap.clear();
       widget.onBack();
     });
   }
@@ -126,7 +120,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   Future<void> _onButtonReset() async {
     if (!await showConfirm(context, "정말로 모든 목록을 초기화하시겠습니까?")) return;
     setState(() {
-      compareResults.clear();
+      resultHashMap.clear();
       controlGroup.clear();
       experimentalGroup.clear();
       widget.onReset();
@@ -136,7 +130,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   /// 비교 결과를 표시하는 위젯
   Widget _buildCompareResults() {
     List<int> statusCount = [0,0,0,0];
-    for(CompareResult item in compareResults) {
+    for(CompareResult item in resultHashMap.values) {
       switch (item.status) {
         case CompareStatus.same:             statusCount[0]++; break;
         case CompareStatus.diff:             statusCount[1]++; break;
@@ -155,7 +149,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                "비교 결과: ${compareResults.length} cases\n"
+                "비교 결과: ${resultHashMap.length} cases\n"
                 "(동일: ${statusCount[0]}개, "
                 "다름: ${statusCount[1]}개, "
                 "왼쪽만: ${statusCount[2]}개, "
@@ -166,62 +160,68 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
           ),
         ),
         Expanded(
-          child: ListView.separated(
-            separatorBuilder: (context, index) { return const Divider(height: 0); },
-            itemCount: compareResults.length+1,
+          child: ListView.builder(
+            itemCount: resultHashMap.length,
             itemBuilder: (context, index) {
-              if (index == compareResults.length) { return const Divider(height: 0); } // 최 하단에 구분선
-              final res = compareResults[index];
+              final CompareResult res = resultHashMap.values.elementAt(index);
               Color tileColor;
               switch (res.status) {
-                case CompareStatus.same:
-                  tileColor = Theme.of(context).colorScheme.highlightSame;
-                  break;
-                case CompareStatus.diff:
-                  tileColor = Theme.of(context).colorScheme.highlightDiff;
-                  break;
-                case CompareStatus.onlyControl:
-                  tileColor = Theme.of(context).colorScheme.highlightOther;
-                  break;
-                case CompareStatus.onlyExperimental:
-                  tileColor = Theme.of(context).colorScheme.highlightOther;
-                  break;
+                case CompareStatus.same:             tileColor = Theme.of(context).colorScheme.highlightSame; break;
+                case CompareStatus.diff:             tileColor = Theme.of(context).colorScheme.highlightDiff; break;
+                case CompareStatus.onlyControl:      tileColor = Theme.of(context).colorScheme.highlightOther; break;
+                case CompareStatus.onlyExperimental: tileColor = Theme.of(context).colorScheme.highlightOther; break;
               }
 
-              Widget leftTile = ((res.controlGroupItem == null)
+              Widget leftTile = ((res.group0 == null)
                 ? Expanded(child: Container())
                 : Expanded(
                   child: Tooltip(
-                    message: '${res.controlGroupItem!.relativePath}\nAccessed: ${res.controlGroupItem!.accessed}\nModified: ${res.controlGroupItem!.modified}',
+                    message: '${res.group0!.relativePath}\n'
+                      'Accessed: ${res.group0!.accessed}\n'
+                      'Modified: ${res.group0!.modified}',
                     child: ListTile(
                       leading: Icon(Icons.insert_drive_file),
-                      title: Text(res.controlGroupItem!.fileName),
-                      subtitle: Text('${res.controlGroupItem!.fileSize} bytes'),
+                      title: Text(res.group0!.fileName),
+                      subtitle: Text('${res.group0!.fileSize} bytes'),
                     ),
                   ),
                 )
               );
-              Widget rightTile = ((res.experimentalGroupItem == null)
+              Widget rightTile = ((res.group1 == null)
                 ? Expanded(child: Container())
                 : Expanded(
                   child: Tooltip(
-                    message: '${res.experimentalGroupItem!.relativePath}\nAccessed: ${res.experimentalGroupItem!.accessed}\nModified: ${res.experimentalGroupItem!.modified}',
+                    message: '${res.group1!.relativePath}\n'
+                      'Accessed: ${res.group1!.accessed}\n'
+                      'Modified: ${res.group1!.modified}',
                     child: ListTile(
-                      title: Text(res.experimentalGroupItem!.fileName, textAlign: TextAlign.right),
-                      subtitle: Text('${res.experimentalGroupItem!.fileSize} bytes', textAlign: TextAlign.right),
+                      title: Text(res.group1!.fileName, textAlign: TextAlign.right),
+                      subtitle: Text('${res.group1!.fileSize} bytes', textAlign: TextAlign.right),
                       trailing: Icon(Icons.insert_drive_file),
                     ),
                   ),
                 )
               );
 
-              return Container(
-                color: tileColor,
-                child: IntrinsicHeight(child: Row(children: [
-                  leftTile,
-                  const VerticalDivider(thickness: 1.0, indent: 5.0, endIndent: 5.0,),
-                  rightTile
-                ]))
+              return Column(
+                children: [
+                  Container(
+                    color: tileColor,
+                    child: Row(
+                      children: [
+                        leftTile,
+                        Container(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)
+                          )
+                        ),
+                        rightTile
+                      ]
+                    ),
+                  ),
+                  const Divider(height: 0), // 최 하단에 구분선
+                ],
               );
             },
           ),
@@ -238,8 +238,9 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
         margin: const EdgeInsets.all(8.0),
         decoration: BoxDecoration(
           border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-              width: 2.0),
+            color: Theme.of(context).colorScheme.outlineVariant,
+            width: 2.0
+          ),
         ),
         child: _buildCompareResults(),
       )),
@@ -271,10 +272,4 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
       ),
     ]);
   }
-}
-
-/// isolate에서 호출할 해시 계산 함수 (동기적으로 파일을 읽어 MD5 해시를 계산)
-Future<String> _calculateHash(String filePath) async {
-  final bytes = File(filePath).readAsBytesSync();
-  return md5.convert(bytes).toString();
 }

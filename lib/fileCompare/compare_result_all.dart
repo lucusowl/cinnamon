@@ -34,7 +34,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
   bool isComparing = false;
   late final List<FileItem> controlGroup;
   late final List<FileItem> experimentalGroup;
-  List<CompareResult> compareResults = [];
+  List<CompareResultOld> compareResults = [];
 
   @override
   void initState() {
@@ -57,7 +57,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
   }
 
   /// 비교 프로세스 B: 전체 파일을 대상으로 해시 비교
-  Future<List<CompareResult>> _compareFilesWithAll(List<FileItem> controlGroup, List<FileItem> experimentalGroup) async {
+  Future<List<CompareResultOld>> _compareFilesWithAll(List<FileItem> controlGroup, List<FileItem> experimentalGroup) async {
     // 그룹화: 해시값 -> 파일 목록
     final Map<String, List<FileItem>> controlGroupHashMap = {};
     final Map<String, List<FileItem>> experimentalGroupHashMap = {};
@@ -71,7 +71,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
     }
 
     final Set<String> allHashes = {...controlGroupHashMap.keys, ...experimentalGroupHashMap.keys};
-    final List<CompareResult> results = [];
+    final List<CompareResultOld> results = [];
 
     for (final hash in allHashes) {
       final controlGroupItems = controlGroupHashMap[hash] ?? [];
@@ -81,7 +81,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         // 실험군에만 존재 (onlyExperimental)
         for (FileItem item in experimentalGroupItems) {
           results.add(
-            CompareResult(
+            CompareResultOld(
               status: CompareStatus.onlyExperimental,
               experimentalGroupHash: hash,
               experimentalGroupItem: item,
@@ -92,7 +92,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         // 대조군에만 존재 (onlyContorl)
         for (FileItem item in controlGroupItems) {
           results.add(
-            CompareResult(
+            CompareResultOld(
               status: CompareStatus.onlyControl,
               controlGroupHash: hash,
               controlGroupItem: item,
@@ -108,7 +108,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         // 공통 파일 (same)
         for (int i = 0; i < minCount; i++) {
           results.add(
-            CompareResult(
+            CompareResultOld(
               status: CompareStatus.same,
               controlGroupHash: hash,
               experimentalGroupHash: hash,
@@ -120,7 +120,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         // 남은 파일들, 위와 동일하지만 표시할 때 매칭이 없음
         for (int i = minCount; i < controlGroupItems.length; i++) {
           results.add(
-            CompareResult(
+            CompareResultOld(
               status: CompareStatus.same,
               controlGroupHash: hash,
               experimentalGroupHash: hash,
@@ -131,7 +131,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         }
         for (int i = minCount; i < experimentalGroupItems.length; i++) {
           results.add(
-            CompareResult(
+            CompareResultOld(
               status: CompareStatus.same,
               controlGroupHash: hash,
               experimentalGroupHash: hash,
@@ -167,7 +167,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
   /// 비교 결과를 표시하는 위젯
   Widget _buildCompareResults() {
     List<int> statusCount = [0,0,0,0];
-    for(CompareResult item in compareResults) {
+    for(CompareResultOld item in compareResults) {
       switch (item.status) {
         case CompareStatus.same:             statusCount[0]++; break;
         case CompareStatus.diff:             statusCount[1]++; break;

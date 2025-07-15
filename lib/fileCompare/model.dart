@@ -30,15 +30,28 @@ enum CompareStatus {
   onlyExperimental, // 실험군에만 있음
 }
 
-/// 비교 상세 결과 객체값
+/// 비교 상세 결과 객체
 class CompareResult {
+  CompareStatus status;
+  FileItem? group0;
+  FileItem? group1;
+
+  CompareResult({
+    required this.status,
+    this.group0,
+    this.group1,
+  });
+}
+
+/// 비교 상세 결과 객체값
+class CompareResultOld {
   final CompareStatus status;
   final String? controlGroupHash;
   final String? experimentalGroupHash;
   final FileItem? controlGroupItem;
   final FileItem? experimentalGroupItem;
 
-  CompareResult({
+  CompareResultOld({
     required this.status,
     this.controlGroupHash,
     this.experimentalGroupHash,
