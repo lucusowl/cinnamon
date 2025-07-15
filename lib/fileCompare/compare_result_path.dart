@@ -143,7 +143,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
       children: [
         Container(
           color: Theme.of(context).colorScheme.surfaceBright,
-          padding: EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(8.0),
           child: Wrap(
             spacing: 8.0,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -180,7 +180,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                       'Accessed: ${res.group0!.accessed}\n'
                       'Modified: ${res.group0!.modified}',
                     child: ListTile(
-                      leading: Icon(Icons.insert_drive_file),
+                      leading: const Icon(Icons.insert_drive_file),
                       title: Text(res.group0!.fileName),
                       subtitle: Text('${res.group0!.fileSize} bytes'),
                     ),
@@ -197,7 +197,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                     child: ListTile(
                       title: Text(res.group1!.fileName, textAlign: TextAlign.right),
                       subtitle: Text('${res.group1!.fileSize} bytes', textAlign: TextAlign.right),
-                      trailing: Icon(Icons.insert_drive_file),
+                      trailing: const Icon(Icons.insert_drive_file),
                     ),
                   ),
                 )

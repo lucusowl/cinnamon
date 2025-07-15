@@ -43,23 +43,6 @@ class CompareResult {
   });
 }
 
-/// 비교 상세 결과 객체값
-class CompareResultOld {
-  final CompareStatus status;
-  final String? controlGroupHash;
-  final String? experimentalGroupHash;
-  final FileItem? controlGroupItem;
-  final FileItem? experimentalGroupItem;
-
-  CompareResultOld({
-    required this.status,
-    this.controlGroupHash,
-    this.experimentalGroupHash,
-    this.controlGroupItem,
-    this.experimentalGroupItem,
-  });
-}
-
 /// 예외처리용
 class FileException implements Exception {
   final String message;

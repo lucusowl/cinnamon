@@ -34,7 +34,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
   bool isComparing = false;
   late final List<FileItem> controlGroup;
   late final List<FileItem> experimentalGroup;
-  List<CompareResultOld> compareResults = [];
+  List<CompareResult> compareResults = [];
 
   @override
   void initState() {
@@ -56,11 +56,17 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
     });
   }
 
-  /// 비교 프로세스 B: 전체 파일을 대상으로 해시 비교
-  Future<List<CompareResultOld>> _compareFilesWithAll(List<FileItem> controlGroup, List<FileItem> experimentalGroup) async {
+  /// 해시 계산 함수
+  Future<Digest> _calculateHash(String filePath) async {
+    final bytes = File(filePath).readAsBytesSync();
+    return md5.convert(bytes);
+  }
+
+  /// 비교 프로세스
+  Future<List<CompareResult>> _compareFilesWithAll(List<FileItem> controlGroup, List<FileItem> experimentalGroup) async {
     // 그룹화: 해시값 -> 파일 목록
-    final Map<String, List<FileItem>> controlGroupHashMap = {};
-    final Map<String, List<FileItem>> experimentalGroupHashMap = {};
+    final Map<Digest, List<FileItem>> controlGroupHashMap = {};
+    final Map<Digest, List<FileItem>> experimentalGroupHashMap = {};
     for (final file in controlGroup) {
       final hash = await _calculateHash(file.fullPath);
       controlGroupHashMap.putIfAbsent(hash, () => []).add(file);
@@ -70,8 +76,8 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
       experimentalGroupHashMap.putIfAbsent(hash, () => []).add(file);
     }
 
-    final Set<String> allHashes = {...controlGroupHashMap.keys, ...experimentalGroupHashMap.keys};
-    final List<CompareResultOld> results = [];
+    final Set<Digest> allHashes = {...controlGroupHashMap.keys, ...experimentalGroupHashMap.keys};
+    final List<CompareResult> results = [];
 
     for (final hash in allHashes) {
       final controlGroupItems = controlGroupHashMap[hash] ?? [];
@@ -81,10 +87,9 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         // 실험군에만 존재 (onlyExperimental)
         for (FileItem item in experimentalGroupItems) {
           results.add(
-            CompareResultOld(
+            CompareResult(
               status: CompareStatus.onlyExperimental,
-              experimentalGroupHash: hash,
-              experimentalGroupItem: item,
+              group1: item,
             ),
           );
         }
@@ -92,10 +97,9 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         // 대조군에만 존재 (onlyContorl)
         for (FileItem item in controlGroupItems) {
           results.add(
-            CompareResultOld(
+            CompareResult(
               status: CompareStatus.onlyControl,
-              controlGroupHash: hash,
-              controlGroupItem: item,
+              group0: item,
             ),
           );
         }
@@ -108,35 +112,29 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         // 공통 파일 (same)
         for (int i = 0; i < minCount; i++) {
           results.add(
-            CompareResultOld(
+            CompareResult(
               status: CompareStatus.same,
-              controlGroupHash: hash,
-              experimentalGroupHash: hash,
-              controlGroupItem: controlGroupItems[i],
-              experimentalGroupItem: experimentalGroupItems[i],
+              group0: controlGroupItems[i],
+              group1: experimentalGroupItems[i],
             ),
           );
         }
         // 남은 파일들, 위와 동일하지만 표시할 때 매칭이 없음
         for (int i = minCount; i < controlGroupItems.length; i++) {
           results.add(
-            CompareResultOld(
+            CompareResult(
               status: CompareStatus.same,
-              controlGroupHash: hash,
-              experimentalGroupHash: hash,
-              controlGroupItem: controlGroupItems[i],
-              experimentalGroupItem: null,
+              group0: controlGroupItems[i],
+              group1: null,
             ),
           );
         }
         for (int i = minCount; i < experimentalGroupItems.length; i++) {
           results.add(
-            CompareResultOld(
+            CompareResult(
               status: CompareStatus.same,
-              controlGroupHash: hash,
-              experimentalGroupHash: hash,
-              controlGroupItem: null,
-              experimentalGroupItem: experimentalGroupItems[i],
+              group0: null,
+              group1: experimentalGroupItems[i],
             ),
           );
         }
@@ -167,7 +165,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
   /// 비교 결과를 표시하는 위젯
   Widget _buildCompareResults() {
     List<int> statusCount = [0,0,0,0];
-    for(CompareResultOld item in compareResults) {
+    for(CompareResult item in compareResults) {
       switch (item.status) {
         case CompareStatus.same:             statusCount[0]++; break;
         case CompareStatus.diff:             statusCount[1]++; break;
@@ -180,7 +178,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
       children: [
         Container(
           color: Theme.of(context).colorScheme.surfaceBright,
-          padding: EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(8.0),
           child: Wrap(
             spacing: 8.0,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -196,62 +194,68 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
           ),
         ),
         Expanded(
-          child: ListView.separated(
-            separatorBuilder: (context, index) { return const Divider(height: 0); },
-            itemCount: compareResults.length+1,
+          child: ListView.builder(
+            itemCount: compareResults.length,
             itemBuilder: (context, index) {
-              if (index == compareResults.length) { return const Divider(height: 0); } // 최 하단에 구분선
-              final res = compareResults[index];
+              final CompareResult res = compareResults[index];
               Color tileColor;
               switch (res.status) {
-                case CompareStatus.same:
-                  tileColor = Theme.of(context).colorScheme.highlightSame;
-                  break;
-                case CompareStatus.diff:
-                  tileColor = Theme.of(context).colorScheme.highlightDiff;
-                  break;
-                case CompareStatus.onlyControl:
-                  tileColor = Theme.of(context).colorScheme.highlightOther;
-                  break;
-                case CompareStatus.onlyExperimental:
-                  tileColor = Theme.of(context).colorScheme.highlightOther;
-                  break;
+                case CompareStatus.same:             tileColor = Theme.of(context).colorScheme.highlightSame; break;
+                case CompareStatus.diff:             tileColor = Theme.of(context).colorScheme.highlightDiff; break;
+                case CompareStatus.onlyControl:      tileColor = Theme.of(context).colorScheme.highlightOther; break;
+                case CompareStatus.onlyExperimental: tileColor = Theme.of(context).colorScheme.highlightOther; break;
               }
 
-              Widget leftTile = ((res.controlGroupItem == null)
+              Widget leftTile = ((res.group0 == null)
                 ? Expanded(child: Container())
                 : Expanded(
                   child: Tooltip(
-                    message: '${res.controlGroupItem!.relativePath}\nAccessed: ${res.controlGroupItem!.accessed}\nModified: ${res.controlGroupItem!.modified}',
+                    message: '${res.group0!.relativePath}\n'
+                      'Accessed: ${res.group0!.accessed}\n'
+                      'Modified: ${res.group0!.modified}',
                     child: ListTile(
-                      leading: Icon(Icons.insert_drive_file),
-                      title: Text(res.controlGroupItem!.fileName),
-                      subtitle: Text('${res.controlGroupItem!.fileSize} bytes'),
+                      leading: const Icon(Icons.insert_drive_file),
+                      title: Text(res.group0!.fileName),
+                      subtitle: Text('${res.group0!.fileSize} bytes'),
                     ),
                   ),
                 )
               );
-              Widget rightTile = ((res.experimentalGroupItem == null)
+              Widget rightTile = ((res.group1 == null)
                 ? Expanded(child: Container())
                 : Expanded(
                   child: Tooltip(
-                    message: '${res.experimentalGroupItem!.relativePath}\nAccessed: ${res.experimentalGroupItem!.accessed}\nModified: ${res.experimentalGroupItem!.modified}',
+                    message: '${res.group1!.relativePath}\n'
+                      'Accessed: ${res.group1!.accessed}\n'
+                      'Modified: ${res.group1!.modified}',
                     child: ListTile(
-                      title: Text(res.experimentalGroupItem!.fileName, textAlign: TextAlign.right),
-                      subtitle: Text('${res.experimentalGroupItem!.fileSize} bytes', textAlign: TextAlign.right),
-                      trailing: Icon(Icons.insert_drive_file),
+                      title: Text(res.group1!.fileName, textAlign: TextAlign.right),
+                      subtitle: Text('${res.group1!.fileSize} bytes', textAlign: TextAlign.right),
+                      trailing: const Icon(Icons.insert_drive_file),
                     ),
                   ),
                 )
               );
 
-              return Container(
-                color: tileColor,
-                child: IntrinsicHeight(child: Row(children: [
-                  leftTile,
-                  const VerticalDivider(thickness: 1.0, indent: 5.0, endIndent: 5.0,),
-                  rightTile
-                ]))
+              return Column(
+                children: [
+                  Container(
+                    color: tileColor,
+                    child: Row(
+                      children: [
+                        leftTile,
+                        Container(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)
+                          )
+                        ),
+                        rightTile
+                      ]
+                    ),
+                  ),
+                  const Divider(height: 0), // 최 하단에 구분선
+                ],
               );
             },
           ),
@@ -301,10 +305,4 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
       ),
     ]);
   }
-}
-
-/// isolate에서 호출할 해시 계산 함수 (동기적으로 파일을 읽어 MD5 해시를 계산)
-Future<String> _calculateHash(String filePath) async {
-  final bytes = File(filePath).readAsBytesSync();
-  return md5.convert(bytes).toString();
 }
