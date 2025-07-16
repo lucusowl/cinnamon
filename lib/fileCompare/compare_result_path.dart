@@ -33,19 +33,15 @@ class CompareResultPathPage extends StatefulWidget {
 
 class _CompareResultPathPageState extends State<CompareResultPathPage> {
   bool isComparing = false;
-  late final List<FileItem> controlGroup;
-  late final List<FileItem> experimentalGroup;
   final HashMap<String, CompareResult> resultHashMap = HashMap();
 
   @override
   void initState() {
     super.initState();
-    controlGroup = widget.controlGroup;
-    experimentalGroup = widget.experimentalGroup;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       setState(() => isComparing = true);
       try {
-        await _compareWithPath(controlGroup, experimentalGroup);
+        await _compareWithPath(widget.controlGroup, widget.experimentalGroup);
         setState(() => isComparing = false);
       } catch (e) {
         showAlert(context, "비교 도중에 문제가 발생했습니다.\n$e");
@@ -121,8 +117,6 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
     if (!await showConfirm(context, "정말로 모든 목록을 초기화하시겠습니까?")) return;
     setState(() {
       resultHashMap.clear();
-      controlGroup.clear();
-      experimentalGroup.clear();
       widget.onReset();
     });
   }

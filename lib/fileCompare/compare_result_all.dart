@@ -32,19 +32,15 @@ class CompareResultAllPage extends StatefulWidget {
 
 class _CompareResultAllPageState extends State<CompareResultAllPage> {
   bool isComparing = false;
-  late final List<FileItem> controlGroup;
-  late final List<FileItem> experimentalGroup;
   List<CompareResult> compareResults = [];
 
   @override
   void initState() {
     super.initState();
-    controlGroup = widget.controlGroup;
-    experimentalGroup = widget.experimentalGroup;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       setState(() => isComparing = true);
       try {
-        final results = await _compareFilesWithAll(controlGroup, experimentalGroup);
+        final results = await _compareFilesWithAll(widget.controlGroup, widget.experimentalGroup);
         setState(() {
           compareResults = results;
           isComparing = false;
@@ -156,8 +152,6 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
     if (!await showConfirm(context, "정말로 모든 목록을 초기화하시겠습니까?")) return;
     setState(() {
       compareResults.clear();
-      controlGroup.clear();
-      experimentalGroup.clear();
       widget.onReset();
     });
   }

@@ -83,6 +83,8 @@ class _FileCompareScreenState extends State<FileCompareScreen> {
         },
         onReset: () {
           for (final pathGroup in pathGroupList) pathGroup.clear();
+          controlGroup.clear();
+          experimentalGroup.clear();
           setState(() => compareMode = CompareMode.none);
         },
       );
@@ -96,6 +98,8 @@ class _FileCompareScreenState extends State<FileCompareScreen> {
         },
         onReset: () {
           for (final pathGroup in pathGroupList) pathGroup.clear();
+          controlGroup.clear();
+          experimentalGroup.clear();
           setState(() => compareMode = CompareMode.none);
         },
       );
