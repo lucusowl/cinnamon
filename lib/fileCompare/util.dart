@@ -10,7 +10,7 @@ Future<void> showAlert(BuildContext context, String message) async {
         clipBehavior: Clip.hardEdge,
         contentPadding: const EdgeInsets.all(32.0),
         actionsPadding: EdgeInsets.zero,
-        content: Text(message),
+        content: SelectableText(message),
         actions: [
           SizedBox(
             width: double.infinity,
