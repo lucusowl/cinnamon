@@ -83,6 +83,7 @@ class ComparePreparePageState extends State<ComparePreparePage> {
     setState(() {
       ServiceFileCompare().uploadTaskCancel(sectionIndex);
       textControllerList[sectionIndex].clear();
+      pathGroup[sectionIndex] = null;
     });
   }
 
@@ -94,36 +95,57 @@ class ComparePreparePageState extends State<ComparePreparePage> {
         Expanded(
           child: Center(
             child: Container(
-              padding: EdgeInsets.all(32.0),
+              padding: EdgeInsets.all(64.0),
               constraints: BoxConstraints(maxWidth: 1200),
-              child: TextField(
-                controller: textControllerList[sectionIndex],
-                onSubmitted: (value) async {
-                  setState(() => isSectionDropping[sectionIndex] = true);
-                  await _onSubmittedURI(sectionIndex, value);
-                  setState(() => isSectionDropping[sectionIndex] = false);
-                },
-                decoration: InputDecoration(
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
-                  border: OutlineInputBorder(),
-                  hintText: "(Group $sectionIndex) 여기에 파일/디렉토리를 드래그 하거나 경로를 입력하세요...",
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.outlineVariant),
-                  prefixIcon: IconButton(
-                    onPressed: () async {
-                      setState(() => isSectionDropping[sectionIndex] = true);
-                      await _onClickedURI(sectionIndex);
-                      setState(() => isSectionDropping[sectionIndex] = false);
-                    },
-                    tooltip: "폴더 직접 선택",
-                    icon: Icon(Icons.file_open)
-                  ),
-                  suffixIcon: (pathGroup[sectionIndex] == null)
-                  ? null
-                  : IconButton(
-                    onPressed: () => clearTargetGroup(sectionIndex),
-                    tooltip: "대상에서 제외",
-                    icon: const Icon(Icons.delete),
-                  ),
+              child: IntrinsicWidth(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+                      child: Text(
+                        'Group ${(sectionIndex == 0)?'A':'B'}',
+                        style: Theme.of(context).textTheme.titleLarge,
+                        textAlign: TextAlign.left,
+                      ),
+                    ),
+                    TextField(
+                      controller: textControllerList[sectionIndex],
+                      onSubmitted: (value) async {
+                        setState(() => isSectionDropping[sectionIndex] = true);
+                        await _onSubmittedURI(sectionIndex, value);
+                        setState(() => isSectionDropping[sectionIndex] = false);
+                      },
+                      decoration: InputDecoration(
+                        focusedBorder: OutlineInputBorder( // 포커스할 경우만 보이게
+                          borderSide: BorderSide(
+                            width: 2,
+                            color: Theme.of(context).colorScheme.primary,
+                          )
+                        ),
+                        border: OutlineInputBorder(borderSide: BorderSide.none), // 테두리 없게
+                        hintText: "여기에 파일/디렉토리를 드래그 하거나 경로를 입력하세요...",
+                        hintStyle: TextStyle(color: Theme.of(context).colorScheme.outline),
+                        prefixIcon: IconButton(
+                          onPressed: () async {
+                            setState(() => isSectionDropping[sectionIndex] = true);
+                            await _onClickedURI(sectionIndex);
+                            setState(() => isSectionDropping[sectionIndex] = false);
+                          },
+                          tooltip: "폴더 직접 선택",
+                          icon: Icon(Icons.file_open)
+                        ),
+                        suffixIcon: (pathGroup[sectionIndex] == null)
+                        ? null
+                        : IconButton(
+                          onPressed: () => clearTargetGroup(sectionIndex),
+                          tooltip: "비교 대상에서 제외",
+                          icon: const Icon(Icons.delete),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
