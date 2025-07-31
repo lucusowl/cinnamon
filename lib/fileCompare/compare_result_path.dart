@@ -2,15 +2,31 @@ import 'dart:collection';
 import 'dart:io';
 
 import 'package:cinnamon/fileCompare/model.dart';
+import 'package:cinnamon/fileCompare/service.dart';
 import 'package:cinnamon/fileCompare/util.dart';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as pathlib;
 
 /// 커스텀 colors
 extension AppColors on ColorScheme {
   Color get highlightSame => (brightness == Brightness.dark) ? const Color(0x2219ff19): const Color(0xffe6ffe6);
   Color get highlightDiff => (brightness == Brightness.dark) ? const Color(0x22ff1919): const Color(0xffffe6e6);
   Color get highlightOther => Colors.transparent;
+}
+
+/// 비교 상세 결과 객체
+class CompareResult {
+  CompareStatus status;
+  String base;
+  FileItem? group0;
+  FileItem? group1;
+
+  CompareResult({
+    required this.status,
+    required this.base,
+    this.group0,
+    this.group1,
+  });
 }
 
 class CompareResultPathPage extends StatefulWidget {
@@ -32,76 +48,134 @@ class CompareResultPathPage extends StatefulWidget {
 }
 
 class _CompareResultPathPageState extends State<CompareResultPathPage> {
-  bool isComparing = false;
+  String group0BasePath = '';
+  String group1BasePath = '';
   final HashMap<String, CompareResult> resultHashMap = HashMap();
+  final List<CompareResult> resultList = [];
+  double progressPercent = -1; // -1은 준비, 0부터 진행률 표시
+  int entireItemIndex = 0;     // 전체 개수
+  int currentItemIndex = 0;    // 완료 개수
+  Stopwatch sw = Stopwatch();  // 시간측정용
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      setState(() => isComparing = true);
+      setState(() => progressPercent = -1);
       try {
-        await _compareWithPath(widget.controlGroup, widget.experimentalGroup);
-        setState(() => isComparing = false);
-      } catch (e) {
-        showAlert(context, "비교 도중에 문제가 발생했습니다.\n$e");
-        setState(() => isComparing = false);
+        /// 결과
+        /// {그룹아이디: [바탕경로, [하위상대경로, ...]}
+        var itemStatus = await ServiceFileCompare().compareTaskStart(
+          /// 작업 결과 수신, 수신되는 대로 비동기 실행됨, batch 결과구조:`{'상대경로':상태값(-1 ~ -6)}`
+          (batch) {
+            int batchCnt = 0;
+            try {
+              (batch as HashMap<String,int>).forEach((path, state) {
+                if (state == -1) {
+                  // 비교전 -> 추가(group0추가)
+                  var currentFilePath = pathlib.join(group0BasePath, path);
+                  var currentFileStat = File(currentFilePath).statSync();
+                  CompareResult ret = CompareResult(
+                    status: CompareStatus.before,
+                    base: path,
+                    group0: FileItem(
+                      fullPath: currentFilePath,
+                      relativePath: path,
+                      fileSize: currentFileStat.size,
+                      modified: currentFileStat.modified,
+                      accessed: currentFileStat.accessed
+                    ),
+                    group1: null
+                  );
+                  resultHashMap[path] = ret;
+                  resultList.add(ret);
+                } else if (state == -2) {
+                  // 비교완료(같음) -> 변경(상태,group1추가)
+                  var currentFilePath = pathlib.join(group1BasePath, path);
+                  var currentFileStat = File(currentFilePath).statSync();
+                  resultHashMap[path]?.status = CompareStatus.same;
+                  resultHashMap[path]?.group1 = FileItem(
+                    fullPath: currentFilePath,
+                    relativePath: path,
+                    fileSize: currentFileStat.size,
+                    modified: currentFileStat.modified,
+                    accessed: currentFileStat.accessed
+                  );
+                } else if (state == -3) {
+                  // 비교완료(다름) -> 변경(상태,group1추가)
+                  var currentFilePath = pathlib.join(group1BasePath, path);
+                  var currentFileStat = File(currentFilePath).statSync();
+                  resultHashMap[path]?.status = CompareStatus.diff;
+                  resultHashMap[path]?.group1 = FileItem(
+                    fullPath: currentFilePath,
+                    relativePath: path,
+                    fileSize: currentFileStat.size,
+                    modified: currentFileStat.modified,
+                    accessed: currentFileStat.accessed
+                  );
+                } else if (state == -4) {
+                  // 비교완료(only0) -> 변경(상태)
+                  resultHashMap[path]?.status = CompareStatus.onlyControl;
+                  batchCnt -= 1; // 비교 전에서 이미 카운팅이 되어 상태만 변경한 것이기에 생략
+                } else if (state == -5) {
+                  // 비교완료(only1) -> 추가(group1추가)
+                  var currentFilePath = pathlib.join(group1BasePath, path);
+                  var currentFileStat = File(currentFilePath).statSync();
+                  CompareResult ret = CompareResult(
+                    status: CompareStatus.onlyExperimental,
+                    base: path,
+                    group0: null,
+                    group1: FileItem(
+                      fullPath: currentFilePath,
+                      relativePath: path,
+                      fileSize: currentFileStat.size,
+                      modified: currentFileStat.modified,
+                      accessed: currentFileStat.accessed
+                    )
+                  );
+                  resultHashMap[path] = ret;
+                  resultList.add(ret);
+                } else { // 오류 -> 에러띄우기
+                  resultHashMap[path]?.status = CompareStatus.error;
+                }
+                batchCnt += 1;
+              });
+            } catch (error) {
+              showAlert(context, "비교 도중에 아래와 같은 문제가 발생하였습니다.\n\n$error");
+            } finally {
+              setState(() {
+                currentItemIndex += batchCnt;
+                progressPercent = currentItemIndex / entireItemIndex;
+              });
+            }
+          },
+          /// 작업 에러 발생
+          (error) {
+            showAlert(context, "비교 도중에 아래와 같은 문제가 발생하여 이전페이지로 이동합니다.\n\n$error").then((_) {
+              resultHashMap.clear();
+              widget.onBack();
+            });
+          },
+          /// 작업 종료, 취소되는 경우도 고려
+          () {
+            debugPrint('완료');
+            setState(() => sw.stop());
+          },
+        );
+        /// 모든 파일 업로드는 완료, 비교 시작
+        setState(() {
+          progressPercent = 0;
+          group0BasePath = itemStatus[0]?[0]; // 바탕경로
+          group1BasePath = itemStatus[1]?[0]; // 바탕경로
+          entireItemIndex = itemStatus[0]?[1].length + itemStatus[1]?[1].length; // 양쪽 총 개수
+          sw.start();
+        });
+      } catch (error) {
+        showAlert(context, "비교 도중에 아래와 같은 문제가 발생하여 이전페이지로 이동합니다.\n\n$error").then((_) {
+          widget.onBack();
+        });
       }
     });
-  }
-
-  /// 해시 계산 함수
-  Future<Digest> _calculateHash(String filePath) async {
-    final bytes = File(filePath).readAsBytesSync();
-    return md5.convert(bytes);
-  }
-
-  /// 비교 프로세스
-  Future<void> _compareWithPath(List<FileItem> controlGroup, List<FileItem> experimentalGroup) async {
-    final sw = Stopwatch()..start();
-    // 대조군 순회
-    for (final item in controlGroup) {
-      resultHashMap[item.relativePath] = CompareResult(
-        status: CompareStatus.onlyControl,
-        group0: item,
-        group1: null
-      );
-    }
-    // 실험군 순회
-    for (final item in experimentalGroup) {
-      CompareResult? existing = resultHashMap[item.relativePath];
-      if (existing == null) {
-        // 같은 경로 없음
-        resultHashMap[item.relativePath] = CompareResult(
-          status: CompareStatus.onlyExperimental,
-          group0: null,
-          group1: item
-        );
-      } else {
-        int tmpSize = existing.group0!.fileSize;
-        if (tmpSize != item.fileSize) {
-          // 파일 크기가 다름
-          existing.status = CompareStatus.diff;
-          existing.group1 = item;
-        } else {
-          final List<Digest> hashBuffer = await Future.wait([
-            _calculateHash(existing.group0!.fullPath),
-            _calculateHash(item.fullPath)
-          ]);
-          if (hashBuffer[0] != hashBuffer[1]) {
-            // 파일 내용도 다름
-            existing.status = CompareStatus.diff;
-            existing.group1 = item;
-          } else {
-            // 파일 내용이 같음
-            existing.status = CompareStatus.same;
-            existing.group1 = item;
-          }
-        }
-      }
-    }
-    sw.stop();
-    debugPrint('경과시간: ${sw.elapsed.toString()}');
   }
 
   /// 버튼 클릭시 비교전 목록 유지
@@ -130,6 +204,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
         case CompareStatus.diff:             statusCount[1]++; break;
         case CompareStatus.onlyControl:      statusCount[2]++; break;
         case CompareStatus.onlyExperimental: statusCount[3]++; break;
+        default:
       }
     }
     return Column(
@@ -146,8 +221,8 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                 "비교 결과: ${resultHashMap.length} cases\n"
                 "(동일: ${statusCount[0]}개, "
                 "다름: ${statusCount[1]}개, "
-                "왼쪽만: ${statusCount[2]}개, "
-                "오른쪽만: ${statusCount[3]}개)",
+                "Group 0만: ${statusCount[2]}개, "
+                "Group 1만: ${statusCount[3]}개)",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -155,15 +230,16 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
         ),
         Expanded(
           child: ListView.builder(
-            itemCount: resultHashMap.length,
+            itemCount: resultList.length,
             itemBuilder: (context, index) {
-              final CompareResult res = resultHashMap.values.elementAt(index);
+              final CompareResult res = resultList.elementAt(index);
               Color tileColor;
               switch (res.status) {
                 case CompareStatus.same:             tileColor = Theme.of(context).colorScheme.highlightSame; break;
                 case CompareStatus.diff:             tileColor = Theme.of(context).colorScheme.highlightDiff; break;
-                case CompareStatus.onlyControl:      tileColor = Theme.of(context).colorScheme.highlightOther; break;
-                case CompareStatus.onlyExperimental: tileColor = Theme.of(context).colorScheme.highlightOther; break;
+                case CompareStatus.onlyControl:
+                case CompareStatus.onlyExperimental:
+                default: tileColor = Theme.of(context).colorScheme.highlightOther;
               }
 
               Widget leftTile = ((res.group0 == null)
@@ -175,7 +251,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                       'Modified: ${res.group0!.modified}',
                     child: ListTile(
                       leading: const Icon(Icons.insert_drive_file),
-                      title: Text(res.group0!.fileName),
+                      title: Text(res.group0!.relativePath),
                       subtitle: Text('${res.group0!.fileSize} bytes'),
                     ),
                   ),
@@ -189,7 +265,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                       'Accessed: ${res.group1!.accessed}\n'
                       'Modified: ${res.group1!.modified}',
                     child: ListTile(
-                      title: Text(res.group1!.fileName, textAlign: TextAlign.right),
+                      title: Text(res.group1!.relativePath, textAlign: TextAlign.right),
                       subtitle: Text('${res.group1!.fileSize} bytes', textAlign: TextAlign.right),
                       trailing: const Icon(Icons.insert_drive_file),
                     ),
@@ -224,6 +300,15 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
     );
   }
 
+  /// 현재 진행률 표시
+  Widget _progressWidget() {
+    if (progressPercent == -1) {
+      return const LinearProgressIndicator();
+    } else {
+      return LinearProgressIndicator(value: progressPercent);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(children: [
@@ -239,29 +324,33 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
         child: _buildCompareResults(),
       )),
       const Divider(height: 8, thickness: 2,),
+      // 현재 진행률 표시
+      _progressWidget(),
+      const Divider(height: 8, thickness: 2,),
       // Bottom Action Button Part
       Padding(
         padding: const EdgeInsets.all(8.0),
         child: SizedBox(
           height: 48.0,
-          child: (isComparing)
-          ? const CircularProgressIndicator() // 비교 중
-          : Row( // After 비교 - 결과 출력
-              spacing: 8.0,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: ElevatedButton.icon(
-                  onPressed: _onButtonBack,
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text("돌아가기")
-                )),
-                Expanded(child: ElevatedButton.icon(
-                  onPressed: _onButtonReset,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text("초기화"),
-                )),
-              ],
-            ),
+          child: Row(
+            spacing: 8.0,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: ElevatedButton.icon(
+                onPressed: _onButtonBack,
+                icon: const Icon(Icons.arrow_back),
+                label: const Text("돌아가기")
+              )),
+              Expanded(child: ElevatedButton.icon(
+                onPressed: _onButtonReset,
+                icon: const Icon(Icons.refresh),
+                label: const Text("초기화"),
+              )),
+              IconButton(onPressed: () {
+                debugPrint('$progressPercent|$entireItemIndex|$currentItemIndex|${sw.elapsed}');
+              }, icon: const Icon(Icons.science_outlined)),
+            ],
+          ),
         ),
       ),
     ]);

@@ -12,6 +12,19 @@ extension AppColors on ColorScheme {
   Color get highlightOther => Colors.transparent;
 }
 
+/// 비교 상세 결과 객체
+class CompareResult {
+  CompareStatus status;
+  FileItem? group0;
+  FileItem? group1;
+
+  CompareResult({
+    required this.status,
+    this.group0,
+    this.group1,
+  });
+}
+
 class CompareResultAllPage extends StatefulWidget {
   final List<FileItem> controlGroup;
   final List<FileItem> experimentalGroup;
@@ -165,6 +178,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         case CompareStatus.diff:             statusCount[1]++; break;
         case CompareStatus.onlyControl:      statusCount[2]++; break;
         case CompareStatus.onlyExperimental: statusCount[3]++; break;
+        default: break;
       }
     }
     return Column(
@@ -198,6 +212,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
                 case CompareStatus.diff:             tileColor = Theme.of(context).colorScheme.highlightDiff; break;
                 case CompareStatus.onlyControl:      tileColor = Theme.of(context).colorScheme.highlightOther; break;
                 case CompareStatus.onlyExperimental: tileColor = Theme.of(context).colorScheme.highlightOther; break;
+                default: tileColor = Theme.of(context).colorScheme.highlightOther; break;
               }
 
               Widget leftTile = ((res.group0 == null)
@@ -209,7 +224,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
                       'Modified: ${res.group0!.modified}',
                     child: ListTile(
                       leading: const Icon(Icons.insert_drive_file),
-                      title: Text(res.group0!.fileName),
+                      title: Text(res.group0!.relativePath),
                       subtitle: Text('${res.group0!.fileSize} bytes'),
                     ),
                   ),
@@ -223,7 +238,7 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
                       'Accessed: ${res.group1!.accessed}\n'
                       'Modified: ${res.group1!.modified}',
                     child: ListTile(
-                      title: Text(res.group1!.fileName, textAlign: TextAlign.right),
+                      title: Text(res.group1!.relativePath, textAlign: TextAlign.right),
                       subtitle: Text('${res.group1!.fileSize} bytes', textAlign: TextAlign.right),
                       trailing: const Icon(Icons.insert_drive_file),
                     ),
