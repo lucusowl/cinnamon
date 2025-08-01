@@ -55,6 +55,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   double progressPercent = -1; // -1은 준비, 0부터 진행률 표시
   int entireItemIndex = 0;     // 전체 개수
   int currentItemIndex = 0;    // 완료 개수
+  String lastItem = '';        // 마지막 비교 파일명
   Stopwatch sw = Stopwatch();  // 시간측정용
 
   @override
@@ -140,6 +141,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                 }
                 batchCnt += 1;
               });
+              lastItem = batch.keys.last;
             } catch (error) {
               showAlert(context, "비교 도중에 아래와 같은 문제가 발생하였습니다.\n\n$error");
             } finally {
@@ -218,11 +220,11 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                "비교 결과: ${resultHashMap.length} cases\n"
-                "(동일: ${statusCount[0]}개, "
-                "다름: ${statusCount[1]}개, "
-                "Group 0만: ${statusCount[2]}개, "
-                "Group 1만: ${statusCount[3]}개)",
+                "총 ${resultHashMap.length} 개 비교결과 "
+                "(동일: ${statusCount[0]}개 | "
+                "다름: ${statusCount[1]}개 | "
+                "Group A에만: ${statusCount[2]}개 | "
+                "Group B에만: ${statusCount[3]}개)",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -233,61 +235,52 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
             itemCount: resultList.length,
             itemBuilder: (context, index) {
               final CompareResult res = resultList.elementAt(index);
-              Color tileColor;
+              late final Icon tileIcon;
+              late final Color tileColor;
+              late final String tileTooltip;
               switch (res.status) {
-                case CompareStatus.same:             tileColor = Theme.of(context).colorScheme.highlightSame; break;
-                case CompareStatus.diff:             tileColor = Theme.of(context).colorScheme.highlightDiff; break;
+                case CompareStatus.same:
+                  tileIcon  = Icon(Icons.done); // Icons.check_circle_outline
+                  tileColor = Theme.of(context).colorScheme.highlightSame;
+                  tileTooltip = 'Group A:${res.group0!.fullPath}\nGroup B:${res.group1!.fullPath}';
+                  break;
+                case CompareStatus.diff:
+                  tileIcon  = Icon(Icons.difference); // Icons.highlight_remove
+                  tileColor = Theme.of(context).colorScheme.highlightDiff;
+                  tileTooltip = 'Group A:${res.group0!.fullPath}\nGroup B:${res.group1!.fullPath}';
+                  break;
                 case CompareStatus.onlyControl:
+                  tileIcon  = Icon(Icons.arrow_back); // Icons.arrow_circle_left_outlined
+                  tileColor = Theme.of(context).colorScheme.highlightOther;
+                  tileTooltip = res.group0!.fullPath;
+                  break;
                 case CompareStatus.onlyExperimental:
-                default: tileColor = Theme.of(context).colorScheme.highlightOther;
+                  tileIcon  = Icon(Icons.arrow_forward); // Icons.arrow_circle_right_outlined
+                  tileColor = Theme.of(context).colorScheme.highlightOther;
+                  tileTooltip = res.group1!.fullPath;
+                  break;
+                case CompareStatus.before:
+                  tileIcon  = Icon(Icons.circle_outlined);
+                  tileColor = Theme.of(context).colorScheme.highlightOther;
+                  tileTooltip = '비교중...';
+                  break;
+                default:
+                  tileIcon  = Icon(Icons.error_outline);
+                  tileColor = Theme.of(context).colorScheme.highlightOther;
+                  tileTooltip = '에러발생!';
               }
-
-              Widget leftTile = ((res.group0 == null)
-                ? Expanded(child: Container())
-                : Expanded(
-                  child: Tooltip(
-                    message: '${res.group0!.relativePath}\n'
-                      'Accessed: ${res.group0!.accessed}\n'
-                      'Modified: ${res.group0!.modified}',
-                    child: ListTile(
-                      leading: const Icon(Icons.insert_drive_file),
-                      title: Text(res.group0!.relativePath),
-                      subtitle: Text('${res.group0!.fileSize} bytes'),
-                    ),
-                  ),
-                )
-              );
-              Widget rightTile = ((res.group1 == null)
-                ? Expanded(child: Container())
-                : Expanded(
-                  child: Tooltip(
-                    message: '${res.group1!.relativePath}\n'
-                      'Accessed: ${res.group1!.accessed}\n'
-                      'Modified: ${res.group1!.modified}',
-                    child: ListTile(
-                      title: Text(res.group1!.relativePath, textAlign: TextAlign.right),
-                      subtitle: Text('${res.group1!.fileSize} bytes', textAlign: TextAlign.right),
-                      trailing: const Icon(Icons.insert_drive_file),
-                    ),
-                  ),
-                )
-              );
 
               return Column(
                 children: [
                   Container(
                     color: tileColor,
-                    child: Row(
-                      children: [
-                        leftTile,
-                        Container(
-                          constraints: const BoxConstraints(minHeight: 48),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)
-                          )
-                        ),
-                        rightTile
-                      ]
+                    child: Tooltip(
+                      message: tileTooltip,
+                      waitDuration: Duration(milliseconds: 500),
+                      child: ListTile(
+                        leading: tileIcon,
+                        title: Text(res.base),
+                      ),
                     ),
                   ),
                   const Divider(height: 0), // 최 하단에 구분선
@@ -303,9 +296,43 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   /// 현재 진행률 표시
   Widget _progressWidget() {
     if (progressPercent == -1) {
-      return const LinearProgressIndicator();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Text('파일을 불러오고 있는 중입니다...'),
+          ),
+          const LinearProgressIndicator(minHeight: 8.0),
+        ],
+      );
+    } else if (progressPercent == 1.0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Text('${(progressPercent * 100).toStringAsFixed(1)}% ($currentItemIndex/$entireItemIndex) | 경과시간: ${durationString(sw.elapsed)} | 모든 파일 비교 완료.'),
+          ),
+          LinearProgressIndicator(value: progressPercent, minHeight: 8.0),
+        ],
+      );
     } else {
-      return LinearProgressIndicator(value: progressPercent);
+      Duration? expected;
+      if (currentItemIndex != 0) {
+        int t = sw.elapsedMilliseconds;
+        expected = Duration(milliseconds: (entireItemIndex/currentItemIndex*t - t).floor());
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Text('${(progressPercent * 100).toStringAsFixed(1)}% ($currentItemIndex/$entireItemIndex) | 경과시간: ${durationString(sw.elapsed)} / 남은예상: ${durationString(expected)} | \"$lastItem\"', overflow: TextOverflow.ellipsis,),
+          ),
+          LinearProgressIndicator(value: progressPercent, minHeight: 8.0),
+        ],
+      );
     }
   }
 
@@ -323,10 +350,10 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
         ),
         child: _buildCompareResults(),
       )),
-      const Divider(height: 8, thickness: 2,),
+      const Divider(height: 0, thickness: 2,),
       // 현재 진행률 표시
       _progressWidget(),
-      const Divider(height: 8, thickness: 2,),
+      const Divider(height: 0, thickness: 2,),
       // Bottom Action Button Part
       Padding(
         padding: const EdgeInsets.all(8.0),

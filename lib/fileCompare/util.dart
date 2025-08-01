@@ -71,3 +71,26 @@ Future<bool> showConfirm(BuildContext context, String message) async {
   );
   return (result == true);
 }
+
+String durationString(Duration? time) {
+  StringBuffer ret = StringBuffer();
+  if (time == null) {
+    ret.write('-');
+  } else {
+    if (time.inDays > 0)    {ret.write(time.inDays); ret.write(':');}
+    if (time.inHours > 0)   {ret.write(time.inHours); ret.write(':');}
+    if (time.inMinutes > 0) {
+      if (time.inMinutes < 10) ret.write('0');
+      ret.write(time.inMinutes);
+      ret.write(':');
+    }
+
+    if (time.inSeconds != 0 && time.inSeconds < 10) {ret.write('0');}
+    ret.write(time.inSeconds);
+    ret.write('.');
+    if (time.inMilliseconds < 100) {ret.write('0');}
+    if (time.inMilliseconds < 10)  {ret.write('0');}
+    ret.write(time.inMilliseconds % 1000);
+  }
+  return ret.toString();
+}
