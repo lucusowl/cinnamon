@@ -72,25 +72,29 @@ Future<bool> showConfirm(BuildContext context, String message) async {
   return (result == true);
 }
 
-String durationString(Duration? time) {
+String durationString(Duration? time, {bool verbose = false}) {
   StringBuffer ret = StringBuffer();
   if (time == null) {
     ret.write('-');
   } else {
-    if (time.inDays > 0)    {ret.write(time.inDays); ret.write(':');}
-    if (time.inHours > 0)   {ret.write(time.inHours); ret.write(':');}
+    // if (time.isNegative) time = time.abs();
+    if (time.inDays > 0)    {ret.write(time.inDays); ret.write((verbose)? '일 ': ':');}
+    if (time.inHours > 0)   {ret.write(time.inHours % Duration.hoursPerDay); ret.write((verbose)? '시간 ': ':');}
     if (time.inMinutes > 0) {
       if (time.inMinutes < 10) ret.write('0');
-      ret.write(time.inMinutes);
-      ret.write(':');
+      ret.write(time.inMinutes % Duration.minutesPerHour);
+      ret.write((verbose)? '분 ': ':');
     }
 
     if (time.inSeconds != 0 && time.inSeconds < 10) {ret.write('0');}
-    ret.write(time.inSeconds);
-    ret.write('.');
+    ret.write(time.inSeconds % Duration.secondsPerMinute);
+    ret.write((verbose)? '초': '.');
     if (time.inMilliseconds < 100) {ret.write('0');}
     if (time.inMilliseconds < 10)  {ret.write('0');}
-    ret.write(time.inMilliseconds % 1000);
+    if (!verbose || (time.inMilliseconds % 1000 != 0)) {
+      ret.write('.');
+      ret.write(time.inMilliseconds % 1000);
+    }
   }
   return ret.toString();
 }

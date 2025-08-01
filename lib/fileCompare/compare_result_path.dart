@@ -5,6 +5,7 @@ import 'package:cinnamon/fileCompare/model.dart';
 import 'package:cinnamon/fileCompare/service.dart';
 import 'package:cinnamon/fileCompare/util.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:path/path.dart' as pathlib;
 
 /// 커스텀 colors
@@ -197,6 +198,173 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
     });
   }
 
+  /// 값 변환
+  String compactSize(int bytes, [int fractionDigits = 2]) {
+    const suffixes = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+    double size = bytes.toDouble();
+    int index = 0;
+
+    while (size >= 1024 && index < suffixes.length - 1) {
+      size /= 1024;
+      index++;
+    }
+    return '${size.toStringAsFixed((index == 0)? 0: fractionDigits)} ${suffixes[index]}';
+  }
+
+  /// 결과 데이터
+  Widget buildRowData(String label, dynamic value, {bool diffValue = false}) {
+    TextStyle? textColorStyle;
+    if (diffValue) {
+      if (value is int) {
+        if (value < 0)      textColorStyle = TextStyle(color: Colors.red);
+        else if (value > 0) textColorStyle = TextStyle(color: Colors.green);
+      } else if (value is Duration) {
+        if (value.isNegative) textColorStyle = TextStyle(color: Colors.red);
+        else if (value > Duration.zero)  textColorStyle = TextStyle(color: Colors.green);
+      }
+    }
+
+    String displayText = 'N/A';
+    if (value != null) {
+      if (value is String) {
+        displayText = value;
+      } else if (value is int) { // 파일 크기
+        var size = NumberFormat.decimalPattern().format(value);
+        if (diffValue) {
+          if (value > 0)      displayText = '+ ${compactSize(value)} ($size bytes)';
+          else if (value < 0) displayText = '- ${compactSize(value.abs())} ($size bytes)';
+          else                displayText = '${compactSize(value)} ($size bytes)';
+        } else {
+          displayText = '${compactSize(value)} ($size bytes)';
+        }
+      } else if (value is DateTime) { // 시각
+        displayText = DateFormat('yyyy년 M월 d일 E a h:m:s.S').format(value);
+      } else if (value is Duration) { // 시간차이값
+        if (value.isNegative) {
+          displayText = '- ' + durationString(value.abs(), verbose: true);
+        } else {
+          displayText = '+ ' + durationString(value, verbose: true);
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(4.0),
+      child: Row(
+        children: [
+          SizedBox(width: 80, child: Text(label)),
+          Expanded(child: SingleChildScrollView(
+            child: Text(
+              displayText,
+              style: textColorStyle,
+            ),
+            scrollDirection: Axis.horizontal)
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 비교 결과 상세 보기
+  void showDetail(CompareResult result) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 16.0,
+                children: [
+                  // Top Button Bar
+                  Row(
+                    children: [
+                      Expanded(child: Tooltip(
+                        message: result.base,
+                        child: Text(
+                          result.base,
+                          style: Theme.of(context).textTheme.titleMedium,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        tooltip: "모달 닫기",
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  // Detail elements
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 8.0,
+                        children: [
+                          ExpansionTile(
+                            title: const Text("절대경로"),
+                            children: [
+                              if(result.group0 != null) buildRowData('Group A', result.group0!.fullPath),
+                              if(result.group1 != null) buildRowData('Group B', result.group1!.fullPath),
+                            ],
+                            initiallyExpanded: true,
+                            shape: Border.fromBorderSide(BorderSide.none),
+                            childrenPadding: const EdgeInsets.all(16.0),
+                            backgroundColor: Theme.of(context).colorScheme.surface,
+                            collapsedBackgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                          ),
+                          ExpansionTile(
+                            title: const Text("파일크기"),
+                            children: [
+                              if(result.group0 != null) buildRowData('Group A', result.group0!.fileSize),
+                              if(result.group0 != null && result.group1 != null) buildRowData('∆', result.group1!.fileSize - result.group0!.fileSize, diffValue: true),
+                              if(result.group1 != null) buildRowData('Group B', result.group1!.fileSize),
+                            ],
+                            shape: Border.fromBorderSide(BorderSide.none),
+                            childrenPadding: const EdgeInsets.all(16.0),
+                            backgroundColor: Theme.of(context).colorScheme.surface,
+                            collapsedBackgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                          ),
+                          ExpansionTile(
+                            title: const Text("마지막 수정 시각"),
+                            children: [
+                              if(result.group0 != null) buildRowData('Group A', result.group0!.modified),
+                              if(result.group0 != null && result.group1 != null) buildRowData('∆', result.group1!.modified.difference(result.group0!.modified), diffValue: true),
+                              if(result.group1 != null) buildRowData('Group B', result.group1!.modified),
+                            ],
+                            shape: Border.fromBorderSide(BorderSide.none),
+                            childrenPadding: const EdgeInsets.all(16.0),
+                            backgroundColor: Theme.of(context).colorScheme.surface,
+                            collapsedBackgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                          ),
+                          ExpansionTile(
+                            title: const Text("최근 접근 시각"),
+                            children: [
+                              if(result.group0 != null) buildRowData('Group A', result.group0!.accessed),
+                              if(result.group0 != null && result.group1 != null) buildRowData('∆', result.group1!.accessed.difference(result.group0!.accessed), diffValue: true),
+                              if(result.group1 != null) buildRowData('Group B', result.group1!.accessed),
+                            ],
+                            shape: Border.fromBorderSide(BorderSide.none),
+                            childrenPadding: const EdgeInsets.all(16.0),
+                            backgroundColor: Theme.of(context).colorScheme.surface,
+                            collapsedBackgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                ],
+              );
+            }
+          ),
+        );
+      }
+    );
+  }
+
   /// 비교 결과를 표시하는 위젯
   Widget _buildCompareResults() {
     List<int> statusCount = [0,0,0,0];
@@ -280,6 +448,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                       child: ListTile(
                         leading: tileIcon,
                         title: Text(res.base),
+                        onTap: () => showDetail(res),
                       ),
                     ),
                   ),
