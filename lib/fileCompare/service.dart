@@ -78,8 +78,8 @@ void uploadTaskEntry(List<dynamic> args) async {
   sendPort.send([basePath, fileList]);
 }
 
-/// 비교 메인 기능
-void compareTaskEntry(List<dynamic> args) async {
+/// 경로 비교 메인 기능
+void compareWithPathTaskEntry(List<dynamic> args) async {
   // << [sendPort, [[바탕경로, [하위상대경로, ...]], ...]]
   // >> {'상대경로': 상태, ...}
   final SendPort sendPort        = args[0];
@@ -221,7 +221,7 @@ class ServiceFileCompare {
   /// 대상 파일 업로드 작업객체
   List<TaskCompleter<List>?> _uploadTask = [null, null];
   /// 대상 파일 비교 작업객체
-  TaskCompleter<List<List<String>>>? _compareTask = null;
+  TaskCompleter? _compareTask = null;
   /// 대상 파일 비교후 작업객체
   TaskCompleter? _compareAfterTask = null;
 
@@ -230,7 +230,7 @@ class ServiceFileCompare {
     // 모든 작업 취소 및 초기화
     uploadTaskCancel(0);
     uploadTaskCancel(1);
-    compareTaskCancel();
+    compareWithPathTaskCancel();
     compareAfterTaskCancel();
     if (restart && pathGroup[0] != null && pathGroup[1] != null) {
       // 그룹 재조사
@@ -305,8 +305,8 @@ class ServiceFileCompare {
     );
   }
 
-  /// 파일 비교 취소
-  void compareTaskCancel() async {
+  /// 파일 경로 비교 취소
+  void compareWithPathTaskCancel() async {
     TaskCompleter? task = _compareTask;
     if (task != null) {
       task.isCancel = true;
@@ -320,8 +320,8 @@ class ServiceFileCompare {
       debugPrint('취소작업 완료');
     }
   }
-  /// 파일 비교 시작
-  Future<Map<int,List>> compareTaskStart(
+  /// 파일 경로 비교 시작
+  Future<Map<int,List>> compareWithPathTaskStart(
     void Function(dynamic) eventCallback,      // 작업 결과(sendPort 포함) 처리
     void Function(dynamic) eventErrorCallback, // 작업 에러 처리
     void Function() eventDoneCallback          // 작업 완료 처리
@@ -335,7 +335,7 @@ class ServiceFileCompare {
     List<List> uploadResults = await Future.wait(futures); // [[바탕경로, [하위상대경로, ...]], ...]
 
     // task 등록
-    TaskCompleter<List<List<String>>> task = TaskCompleter();
+    TaskCompleter task = TaskCompleter();
     _compareTask = task;
     // isolate listener 등록
     final dataPort = ReceivePort();
@@ -350,7 +350,7 @@ class ServiceFileCompare {
     task.ports = [dataPort, errorPort, exitPort];
     // isolate compare 등록 & 시작
     task.isolate = await Isolate.spawn(
-      compareTaskEntry,
+      compareWithPathTaskEntry,
       [dataPort.sendPort, uploadResults],
       onError: errorPort.sendPort,
       onExit: exitPort.sendPort,

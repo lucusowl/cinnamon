@@ -68,7 +68,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
       try {
         /// 결과
         /// {그룹아이디: [바탕경로, [하위상대경로, ...]}
-        var itemStatus = await ServiceFileCompare().compareTaskStart(
+        var itemStatus = await ServiceFileCompare().compareWithPathTaskStart(
           /// 작업 결과 수신, 수신되는 대로 비동기 실행됨, batch 결과구조:`{'상대경로':상태값(-1 ~ -6)}`
           (batch) {
             int batchCnt = 0;
