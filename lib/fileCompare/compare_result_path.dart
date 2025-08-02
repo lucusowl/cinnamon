@@ -734,15 +734,15 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
           if(!isAfterActionOngoing) Row(
             spacing: 8.0,
             children: [
-              const SizedBox(width: 80, child: Text('적용방향', textAlign: TextAlign.center,)),
-              _buildRadioSelection('Group A -> B', 'AB'),
-              _buildRadioSelection('Group B -> A', 'BA'),
+              const SizedBox(width: 80, child: Text('대상그룹', textAlign: TextAlign.center,)),
+              _buildRadioSelection('Group A', 'AB'),
+              _buildRadioSelection('Group B', 'BA'),
             ]
           ),
           if(!isAfterActionOngoing) Row(
             spacing: 8.0,
             children: [
-              const SizedBox(width: 80, child: Text('적용대상', textAlign: TextAlign.center)),
+              const SizedBox(width: 80, child: Text('대상상태', textAlign: TextAlign.center)),
               _buildCheckboxSelection('동일', 0),
               _buildCheckboxSelection('다름', 1),
               _buildCheckboxSelection('Group A만', 2),
@@ -755,20 +755,29 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
               spacing: 8.0,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: ElevatedButton.icon(
-                  onPressed: (isAfterActionOngoing)? null: () {_afterActionInit('move');}, // 이동 작업 시작
-                  icon: const Icon(Icons.drive_file_move),
-                  label: const Text("병합(이동)")
+                Expanded(child: Tooltip(
+                  message: '지정한 대상그룹의 파일 중에\n선택한 상태의 파일만 "반대쪽 그룹"으로 이동합니다.\n같은 이름일 경우 덮어 씌워집니다.',
+                  child: ElevatedButton.icon(
+                    onPressed: (isAfterActionOngoing)? null: () {_afterActionInit('move');}, // 이동 작업 시작
+                    icon: const Icon(Icons.drive_file_move),
+                    label: const Text("병합(이동)")
+                  ),
                 )),
-                Expanded(child: ElevatedButton.icon(
-                  onPressed: (isAfterActionOngoing)? null: () {_afterActionInit('delete');}, // 삭제 작업 시작
-                  icon: const Icon(Icons.delete),
-                  label: const Text("삭제(출발지 대상)"),
+                Expanded(child: Tooltip(
+                  message: '지정한 대상그룹의 파일 중에\n선택한 상태의 파일만 삭제합니다.',
+                  child: ElevatedButton.icon(
+                    onPressed: (isAfterActionOngoing)? null: () {_afterActionInit('delete');}, // 삭제 작업 시작
+                    icon: const Icon(Icons.delete),
+                    label: const Text("삭제"),
+                  ),
                 )),
-                Expanded(child: ElevatedButton.icon(
-                  onPressed: (isAfterActionOngoing)? null: () {_afterActionInit('copy');}, // 복사 작업 시작
-                  icon: const Icon(Icons.file_copy),
-                  label: const Text("복사"),
+                Expanded(child: Tooltip(
+                  message: '지정한 대상그룹의 파일 중에\n선택한 상태의 파일만 "반대쪽 그룹"으로 복사합니다.\n같은 이름일 경우 덮어 씌워집니다.',
+                  child: ElevatedButton.icon(
+                    onPressed: (isAfterActionOngoing)? null: () {_afterActionInit('copy');}, // 복사 작업 시작
+                    icon: const Icon(Icons.file_copy),
+                    label: const Text("복사"),
+                  ),
                 )),
                 Expanded(child: ElevatedButton.icon(
                   onPressed: (isAfterActionOngoing)
