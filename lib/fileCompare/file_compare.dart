@@ -31,15 +31,12 @@ class _FileCompareScreenState extends State<FileCompareScreen> {
     switch (compareMode) {
       case CompareMode.path:
       mainBodyWidget = CompareResultPathPage(
-        controlGroup: controlGroup,
-        experimentalGroup: experimentalGroup,
         onBack: () {
+          ServiceFileCompare().serviceReset(restart: true);
           setState(() => compareMode = CompareMode.none);
         },
         onReset: () {
           ServiceFileCompare().serviceReset();
-          controlGroup.clear();
-          experimentalGroup.clear();
           setState(() => compareMode = CompareMode.none);
         },
       );

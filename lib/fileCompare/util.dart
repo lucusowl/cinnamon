@@ -88,7 +88,7 @@ String durationString(Duration? time, {bool verbose = false}) {
 
     if (time.inSeconds != 0 && time.inSeconds < 10) {ret.write('0');}
     ret.write(time.inSeconds % Duration.secondsPerMinute);
-    ret.write((verbose)? '초': '.');
+    if (verbose) ret.write('초');
     if (time.inMilliseconds < 100) {ret.write('0');}
     if (time.inMilliseconds < 10)  {ret.write('0');}
     if (!verbose || (time.inMilliseconds % 1000 != 0)) {

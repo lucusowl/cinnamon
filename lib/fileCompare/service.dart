@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:cinnamon/fileCompare/semaphore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as pathlib;
@@ -169,6 +170,45 @@ void compareTaskEntry(List<dynamic> args) async {
   sw.stop();
 }
 
+/// 추가작업 메인 기능
+void compareAfterTaskEntry(List<dynamic> args) async {
+  final SendPort sendPort  = args[0];
+  final String actionMode  = args[1];
+  final String srcPath     = args[2];
+  final String? dstPath    = args[3];
+  final List<String> files = args[4];
+
+  final concurrencyLimit = 10;
+  final semaphore = AsyncSemaphore(concurrencyLimit);
+
+  for (final filePath in files) {
+    semaphore.run(() async {
+      final srcFullPath = pathlib.join(srcPath, filePath);
+      try {
+        switch (actionMode) {
+          case 'move':
+            final newPath = pathlib.join(dstPath!, filePath);
+            await File(srcFullPath).rename(newPath);
+            break;
+          case 'delete':
+            await File(srcFullPath).delete();
+            break;
+          case 'copy':
+            final newPath = pathlib.join(dstPath!, filePath);
+            await File(srcFullPath).copy(newPath);
+            break;
+          default: // 이외의 다른 작업은 무시
+        }
+        sendPort.send(filePath);
+      } on PathNotFoundException catch (_) {
+        // 파일이 없을 경우, 무시
+      } catch (error) {
+        throw FileException('파일작업 중 오류가 발생했습니다.\n$error');
+      }
+    });
+  }
+}
+
 /// ## 파일 비교 서비스
 class ServiceFileCompare {
   /// Singleton Pattern
@@ -180,17 +220,26 @@ class ServiceFileCompare {
   List<String?> pathGroup = [null, null];
   /// 대상 파일 업로드 작업객체
   List<TaskCompleter<List>?> _uploadTask = [null, null];
-  /// 대상 파일 비교작업 객체
+  /// 대상 파일 비교 작업객체
   TaskCompleter<List<List<String>>>? _compareTask = null;
+  /// 대상 파일 비교후 작업객체
+  TaskCompleter? _compareAfterTask = null;
 
   /// 모든 작업 취소와 저장값 초기화
-  void serviceReset() {
+  void serviceReset({bool restart=false}) {
     // 모든 작업 취소 및 초기화
     uploadTaskCancel(0);
     uploadTaskCancel(1);
     compareTaskCancel();
-    // 그룹 초기화
-    pathGroup = [null, null];
+    compareAfterTaskCancel();
+    if (restart && pathGroup[0] != null && pathGroup[1] != null) {
+      // 그룹 재조사
+      uploadTaskStart(0, pathGroup[0]!);
+      uploadTaskStart(1, pathGroup[1]!);
+    } else {
+      // 그룹 초기화
+      pathGroup = [null, null];
+    }
     debugPrint('작업과 대상 모두 초기화 완료');
   }
 
@@ -314,5 +363,52 @@ class ServiceFileCompare {
       ret[i++] = groupItem;
     }
     return ret;
+  }
+
+  /// 파일 추가작업 취소
+  void compareAfterTaskCancel() {
+    TaskCompleter? task = _compareAfterTask;
+    if (task != null) {
+      task.isCancel = true;
+      if (task.isolate != null) {
+        task.isolate!.kill(priority: Isolate.immediate);
+        task.isolate = null;
+        debugPrint('isolate 존재하여 kill 요청');
+      }
+      task.closeAllPorts();
+      task = null;
+      debugPrint('취소작업 완료');
+    }
+  }
+  /// 파일 추가작업 시작
+  Future<void> compareAfterTaskStart(
+    String actionMode,                         // 작업 종류 (이동,삭제,복사)
+    String srcPath,                            // 출발지
+    String? dstPath,                           // 도착지
+    List<String> targetList,                   // 작업 대상 목록
+    void Function(dynamic) eventCallback,      // 작업 결과(sendPort 포함) 처리
+    void Function(dynamic) eventErrorCallback, // 작업 에러 처리
+    void Function() eventDoneCallback          // 작업 완료 처리
+  ) async {
+    TaskCompleter task = TaskCompleter();
+    _compareAfterTask = task;
+    // isolate listener 등록
+    final dataPort = ReceivePort();
+    final errorPort = ReceivePort();
+    final exitPort = ReceivePort();
+    dataPort.listen(eventCallback);
+    errorPort.listen(eventErrorCallback);
+    exitPort.listen((event) {
+      eventDoneCallback();
+      task.closeAllPorts();
+    });
+    task.ports = [dataPort, errorPort, exitPort];
+    // isolate compare 등록 & 시작
+    task.isolate = await Isolate.spawn(
+      compareAfterTaskEntry,
+      [dataPort.sendPort, actionMode, srcPath, dstPath, targetList],
+      onError: errorPort.sendPort,
+      onExit: exitPort.sendPort,
+    );
   }
 }

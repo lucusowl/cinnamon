@@ -31,15 +31,11 @@ class CompareResult {
 }
 
 class CompareResultPathPage extends StatefulWidget {
-  final List<FileItem> controlGroup;
-  final List<FileItem> experimentalGroup;
   final void Function() onBack;
   final void Function() onReset;
 
   const CompareResultPathPage({
     super.key,
-    required this.controlGroup,
-    required this.experimentalGroup,
     required this.onBack,
     required this.onReset,
   });
@@ -58,6 +54,11 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   int currentItemIndex = 0;    // 완료 개수
   String lastItem = '';        // 마지막 비교 파일명
   Stopwatch sw = Stopwatch();  // 시간측정용
+
+  bool isActionMode = false;    // 현재 추가작업모드 여부
+  bool isActionOngoing = false; // 추가작업 진행중 여부
+  String actionDirection = 'AB'; // 적용방향
+  List<bool> actionTargets = [false, false, false, false]; // 적용대상
 
   @override
   void initState() {
@@ -91,6 +92,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                   );
                   resultHashMap[path] = ret;
                   resultList.add(ret);
+                  // batchCnt += 0;
                 } else if (state == -2) {
                   // 비교완료(같음) -> 변경(상태,group1추가)
                   var currentFilePath = pathlib.join(group1BasePath, path);
@@ -103,6 +105,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                     modified: currentFileStat.modified,
                     accessed: currentFileStat.accessed
                   );
+                  batchCnt += 2;
                 } else if (state == -3) {
                   // 비교완료(다름) -> 변경(상태,group1추가)
                   var currentFilePath = pathlib.join(group1BasePath, path);
@@ -115,10 +118,11 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                     modified: currentFileStat.modified,
                     accessed: currentFileStat.accessed
                   );
+                  batchCnt += 2;
                 } else if (state == -4) {
                   // 비교완료(only0) -> 변경(상태)
                   resultHashMap[path]?.status = CompareStatus.onlyControl;
-                  batchCnt -= 1; // 비교 전에서 이미 카운팅이 되어 상태만 변경한 것이기에 생략
+                  batchCnt += 1;
                 } else if (state == -5) {
                   // 비교완료(only1) -> 추가(group1추가)
                   var currentFilePath = pathlib.join(group1BasePath, path);
@@ -137,18 +141,19 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                   );
                   resultHashMap[path] = ret;
                   resultList.add(ret);
+                  batchCnt += 1;
                 } else { // 오류 -> 에러띄우기
                   resultHashMap[path]?.status = CompareStatus.error;
+                  batchCnt += 1;
                 }
-                batchCnt += 1;
               });
-              lastItem = batch.keys.last;
+              if (batch.length > 0) lastItem = batch.keys.last;
             } catch (error) {
               showAlert(context, "비교 도중에 아래와 같은 문제가 발생하였습니다.\n\n$error");
             } finally {
               setState(() {
                 currentItemIndex += batchCnt;
-                progressPercent = currentItemIndex / entireItemIndex;
+                progressPercent = (entireItemIndex > 0)? currentItemIndex / entireItemIndex: 0.0;
               });
             }
           },
@@ -161,7 +166,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
           },
           /// 작업 종료, 취소되는 경우도 고려
           () {
-            debugPrint('완료');
+            debugPrint('비교 완료');
             setState(() => sw.stop());
           },
         );
@@ -171,6 +176,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
           group0BasePath = itemStatus[0]?[0]; // 바탕경로
           group1BasePath = itemStatus[1]?[0]; // 바탕경로
           entireItemIndex = itemStatus[0]?[1].length + itemStatus[1]?[1].length; // 양쪽 총 개수
+          currentItemIndex = 0;
           sw.start();
         });
       } catch (error) {
@@ -391,8 +397,8 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                 "총 ${resultHashMap.length} 개 비교결과 "
                 "(동일: ${statusCount[0]}개 | "
                 "다름: ${statusCount[1]}개 | "
-                "Group A에만: ${statusCount[2]}개 | "
-                "Group B에만: ${statusCount[3]}개)",
+                "Group A만: ${statusCount[2]}개 | "
+                "Group B만: ${statusCount[3]}개)",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -470,7 +476,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-            child: Text('파일을 불러오고 있는 중입니다...'),
+            child: Text('대상을 불러오고 있는 중입니다...'),
           ),
           const LinearProgressIndicator(minHeight: 8.0),
         ],
@@ -481,7 +487,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
         children: [
           Padding(
             padding: const EdgeInsets.all(12.0),
-            child: Text('${(progressPercent * 100).toStringAsFixed(1)}% ($currentItemIndex/$entireItemIndex) | 경과시간: ${durationString(sw.elapsed)} | 모든 파일 비교 완료.'),
+            child: Text('${(progressPercent * 100).toStringAsFixed(1)}% ($currentItemIndex/$entireItemIndex) | 경과시간: ${durationString(sw.elapsed)} | 모든 작업 완료.'),
           ),
           LinearProgressIndicator(value: progressPercent, minHeight: 8.0),
         ],
@@ -501,6 +507,305 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
           ),
           LinearProgressIndicator(value: progressPercent, minHeight: 8.0),
         ],
+      );
+    }
+  }
+
+  /// 선택지 위젯 (라디오 버튼)
+  Widget _buildRadioSelection(String label, String selectedValue) {
+    return Expanded(child: InkWell(
+      onTap: () {setState(() => actionDirection = selectedValue);},
+      child: Row(
+        children: [
+          Radio<String>(
+            value: selectedValue,
+            groupValue:actionDirection,
+            onChanged: (value) {setState(() => actionDirection = value ?? selectedValue);}
+          ),
+          Text(label),
+        ],
+      )),
+    );
+  }
+  /// 선택지 위젯 (체크박스 버튼)
+  Widget _buildCheckboxSelection(String label, int selectedIndex) {
+    return Expanded(child: InkWell(
+      onTap: () {setState(() => actionTargets[selectedIndex] = !actionTargets[selectedIndex]);},
+      child: Row(
+        children: [
+          Checkbox(
+            value: actionTargets[selectedIndex],
+            onChanged: (checked) {setState(() => actionTargets[selectedIndex] = !actionTargets[selectedIndex]);}
+          ),
+          Text(label),
+        ],
+      )),
+    );
+  }
+
+  /// 추가작업 수행
+  void _actionInit(String actionType) async { // move, delete, copy
+    // 1. 현재 인자 검증
+    late final bool isFromGroupA;
+    late final String srcPath;
+    late final String dstPath;
+    if (actionDirection == 'AB') {
+      srcPath = group0BasePath;
+      dstPath = group1BasePath;
+      isFromGroupA = true;
+    } else if (actionDirection == 'BA') {
+      srcPath = group1BasePath;
+      dstPath = group0BasePath;
+      isFromGroupA = false;
+    } else {
+      showAlert(context, '부적절한 적용방향이 전달되었습니다. 다시 시도해주세요.');
+      return;
+    }
+    // 2. 순회하며 대상 필터링
+    List<bool> targetStatus = [];
+    for (bool flag in actionTargets) {targetStatus.add(flag);}
+    List<String> targets = [];
+    resultHashMap.forEach((path, itemCase) {
+      final itemStatus = itemCase.status;
+      if (
+        (itemStatus == CompareStatus.same && targetStatus[0])
+        || (itemStatus == CompareStatus.diff && targetStatus[1])
+        || (itemStatus == CompareStatus.onlyControl && targetStatus[2])
+        || (itemStatus == CompareStatus.onlyExperimental && targetStatus[3])
+      ) {
+        targets.add(itemCase.base);
+      }
+    });
+
+    if (actionType == 'move') {
+      if(!await showConfirm(context, '총 ${targets.length}개의 파일이 이동합니다.\n같은 이름의 파일은 덮어씌워집니다.\n정말로 병합하시겠습니까?')) return;
+    } else if (actionType == 'delete') {
+      if(!await showConfirm(context, '총 ${targets.length}개의 파일이 삭제됩니다.\n삭제한 파일들은 복구할 수 없습니다.\n정말로 삭제하시겠습니까?')) return;
+    } else if (actionType == 'copy') {
+      if(!await showConfirm(context, '총 ${targets.length}개의 파일이 복사합니다.\n파일을 복사하시겠습니까?')) return;
+    } else {
+      showAlert(context, '부적절한 작업방식이 전달되었습니다. 다시 시도해주세요.');
+      return;
+    }
+    setState(() {
+      isActionOngoing = true;
+      progressPercent = -1;
+    });
+    // 3. isolate 시작 호출 + 응답 정의
+    /// actionType
+    /// srcPath, dstPath
+    /// targets
+    await ServiceFileCompare().compareAfterTaskStart(
+      actionType, srcPath, dstPath, targets,
+      // 작업결과 수신, 수신되는 대로 비동기실행 고려, batch구조: ['상대경로', ...]
+      (item) {
+        try {
+          /// 작업에 따라 상태 변경: 원래상태 + 작업종류 -> 이후상태
+          /// 
+          /// |        | move AB | delete A | copy AB | move BA | delete B | copy AB |
+          /// | ------ | ------- | -------- | ------- | ------- | -------- | ------- |
+          /// | same   | onlyB   | onlyB    | same    | onlyA   | onlyA    | same    |
+          /// | diff   | onlyB   | onlyB    | same    | onlyA   | onlyA    | same    |
+          /// | onlyA  | onlyB   | (x)      | same    | onlyA   | onlyA    | onlyA   |
+          /// | onlyB  | onlyB   | onlyB    | onlyB   | onlyA   | (x)      | same    |
+          /// 
+          CompareResult? resultItem = resultHashMap[item];
+          if (resultItem == null) {
+            /// 도중에 삭제된 상태임 -> 오류
+          } else {
+            if (isFromGroupA && resultItem.status == CompareStatus.onlyExperimental
+              || !isFromGroupA && resultItem.status == CompareStatus.onlyControl) {
+              // 추가작업 후에도 상태 변화가 없는 경우
+            } else if (actionType == 'copy') {
+              // 복사작업 후 상태가 변경된 경우 (양쪽이 같은 파일을 가짐)
+              resultItem.status = CompareStatus.same;
+              if (resultItem.group0 == null) {
+                var currentFilePath = pathlib.join(group0BasePath, item);
+                var currentFileStat = File(currentFilePath).statSync();
+                resultItem.group0 = FileItem(
+                  fullPath: currentFilePath,
+                  relativePath: item,
+                  fileSize: currentFileStat.size,
+                  modified: currentFileStat.modified,
+                  accessed: currentFileStat.accessed
+                );
+              }
+              if (resultItem.group1 == null) {
+                var currentFilePath = pathlib.join(group1BasePath, item);
+                var currentFileStat = File(currentFilePath).statSync();
+                resultItem.group1 = FileItem(
+                  fullPath: currentFilePath,
+                  relativePath: item,
+                  fileSize: currentFileStat.size,
+                  modified: currentFileStat.modified,
+                  accessed: currentFileStat.accessed
+                );
+              }
+            } else if (actionType == 'delete'
+              && (isFromGroupA && resultItem.status == CompareStatus.onlyControl
+                || !isFromGroupA && resultItem.status == CompareStatus.onlyExperimental)) {
+              // 삭제작업 후 상태가 변경된 경우 (파일없앰)
+              resultList.remove(resultItem);
+              resultHashMap.remove(item);
+            } else {
+              // 이외 모든 상태 변경 (받는쪽만 파일존재)
+              if (isFromGroupA) {
+                resultItem.status = CompareStatus.onlyExperimental;
+                if (resultItem.group0 != null) {resultItem.group0 = null;}
+                if (resultItem.group1 == null) {
+                  var currentFilePath = pathlib.join(group1BasePath, item);
+                  var currentFileStat = File(currentFilePath).statSync();
+                  resultItem.group1 = FileItem(
+                    fullPath: currentFilePath,
+                    relativePath: item,
+                    fileSize: currentFileStat.size,
+                    modified: currentFileStat.modified,
+                    accessed: currentFileStat.accessed
+                  );
+                }
+              } else {
+                resultItem.status = CompareStatus.onlyControl;
+                if (resultItem.group0== null) {
+                  var currentFilePath = pathlib.join(group0BasePath, item);
+                  var currentFileStat = File(currentFilePath).statSync();
+                  resultItem.group0 = FileItem(
+                    fullPath: currentFilePath,
+                    relativePath: item,
+                    fileSize: currentFileStat.size,
+                    modified: currentFileStat.modified,
+                    accessed: currentFileStat.accessed
+                  );
+                }
+                if (resultItem.group1 != null) {resultItem.group1 = null;}
+              }
+            }
+          }
+        } catch (error) {
+          showAlert(context, "추가작업 결과를 반영하던 중에 아래와 같은 문제가 발생하였습니다.\n\n$error");
+        } finally {
+          setState(() {
+            currentItemIndex += 1;
+            progressPercent = (entireItemIndex > 0)? currentItemIndex / entireItemIndex: 0.0;
+          });
+        }
+      },
+      // 작업 에러 발생
+      (error) {
+        showAlert(context, "추가작업 도중에 아래와 같은 문제가 발생하였습니다.\n\n$error");
+      },
+      // 작업 종료, 취소/에러되는 경우도 고려
+      () {
+        debugPrint('추가 작업 완료');
+        setState(() {
+          isActionOngoing = false;
+          sw.stop();
+        });
+      },
+    );
+    /// 추가작업 시작
+    setState(() {
+      progressPercent = 0;
+      entireItemIndex = targets.length;
+      currentItemIndex = 0;
+      sw.reset();
+      sw.start();
+    });
+  }
+
+  /// 추가작업 취소
+  void _actionCancel() {
+    // 1. isolate 취소 호출
+    ServiceFileCompare().compareAfterTaskCancel();
+    // 2. 추가작업 상태자 변경, 타이머 정지
+    setState(() {
+      isActionOngoing = false;
+      sw.stop();
+      if (progressPercent == -1) {progressPercent = 1.0;}
+    });
+    showAlert(context, '작업이 취소되었습니다.\n일부 중단된 내용들은 위 리스트에 상태가 반영되지 않았을 수도 있습니다. 내용을 확인해주세요.');
+  }
+
+  /// 작업에 따른 하단 버튼바
+  Widget _buildBottomActionBar() {
+    if (isActionMode) {
+      return Column(
+        spacing: 8.0,
+        children: [
+          if(!isActionOngoing) Row(
+            spacing: 8.0,
+            children: [
+              const SizedBox(width: 80, child: Text('적용방향', textAlign: TextAlign.center,)),
+              _buildRadioSelection('Group A -> B', 'AB'),
+              _buildRadioSelection('Group B -> A', 'BA'),
+            ]
+          ),
+          if(!isActionOngoing) Row(
+            spacing: 8.0,
+            children: [
+              const SizedBox(width: 80, child: Text('적용대상', textAlign: TextAlign.center)),
+              _buildCheckboxSelection('동일', 0),
+              _buildCheckboxSelection('다름', 1),
+              _buildCheckboxSelection('Group A만', 2),
+              _buildCheckboxSelection('Group B만', 3),
+            ]
+          ),
+          SizedBox(
+            height: 48.0,
+            child: Row(
+              spacing: 8.0,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: ElevatedButton.icon(
+                  onPressed: (isActionOngoing)? null: () {_actionInit('move');}, // 이동 작업 시작
+                  icon: const Icon(Icons.drive_file_move),
+                  label: const Text("병합(이동)")
+                )),
+                Expanded(child: ElevatedButton.icon(
+                  onPressed: (isActionOngoing)? null: () {_actionInit('delete');}, // 삭제 작업 시작
+                  icon: const Icon(Icons.delete),
+                  label: const Text("삭제(출발지 대상)"),
+                )),
+                Expanded(child: ElevatedButton.icon(
+                  onPressed: (isActionOngoing)? null: () {_actionInit('copy');}, // 복사 작업 시작
+                  icon: const Icon(Icons.file_copy),
+                  label: const Text("복사"),
+                )),
+                Expanded(child: ElevatedButton.icon(
+                  onPressed: (isActionOngoing)
+                    ? _actionCancel // 작업 취소
+                    : () => setState(() {isActionMode = false; isActionOngoing = false;}),
+                  icon: const Icon(Icons.cancel),
+                  label: const Text("추가작업 취소"),
+                )),
+              ]
+            ),
+          ),
+        ],
+      );
+    } else {
+      return SizedBox(
+        height: 48.0,
+        child: Row(
+          spacing: 8.0,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: ElevatedButton.icon(
+              onPressed: _onButtonBack,
+              icon: const Icon(Icons.arrow_back),
+              label: const Text("돌아가기")
+            )),
+            Expanded(child: ElevatedButton.icon(
+              onPressed: _onButtonReset,
+              icon: const Icon(Icons.refresh),
+              label: const Text("초기화"),
+            )),
+            Expanded(child: ElevatedButton.icon(
+              onPressed: (progressPercent == 1.0)? () {setState(() {isActionMode = true; isActionOngoing = false;});}: null,
+              icon: const Icon(Icons.forward),
+              label: const Text("추가작업"),
+            )),
+          ],
+        ),
       );
     }
   }
@@ -526,28 +831,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
       // Bottom Action Button Part
       Padding(
         padding: const EdgeInsets.all(8.0),
-        child: SizedBox(
-          height: 48.0,
-          child: Row(
-            spacing: 8.0,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: ElevatedButton.icon(
-                onPressed: _onButtonBack,
-                icon: const Icon(Icons.arrow_back),
-                label: const Text("돌아가기")
-              )),
-              Expanded(child: ElevatedButton.icon(
-                onPressed: _onButtonReset,
-                icon: const Icon(Icons.refresh),
-                label: const Text("초기화"),
-              )),
-              IconButton(onPressed: () {
-                debugPrint('$progressPercent|$entireItemIndex|$currentItemIndex|${sw.elapsed}');
-              }, icon: const Icon(Icons.science_outlined)),
-            ],
-          ),
-        ),
+        child: _buildBottomActionBar(),
       ),
     ]);
   }
