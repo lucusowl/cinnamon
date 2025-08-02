@@ -124,10 +124,10 @@ void compareTaskEntry(List<dynamic> args) async {
       var group0file = pathlib.join(group0BasePath, file);
       var group1file = pathlib.join(group1BasePath, file);
       var fileStats = await Future.wait([
-        File(group0file).stat(),
-        File(group1file).stat(),
+        File(group0file).length(),
+        File(group1file).length(),
       ]);
-      if (fileStats[0].size != fileStats[1].size) {
+      if (fileStats[0] != fileStats[1]) {
         // 파일 크기가 다름 -> 비교후(다름)
         batch[file] = -3;
       } else {
