@@ -453,7 +453,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                       waitDuration: Duration(milliseconds: 500),
                       child: ListTile(
                         leading: tileIcon,
-                        title: Text(res.base),
+                        title: Text(res.base, overflow: TextOverflow.ellipsis,),
                         onTap: () => _showDetail(res),
                       ),
                     ),
