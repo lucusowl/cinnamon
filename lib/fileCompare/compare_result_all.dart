@@ -93,21 +93,21 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
       final experimentalGroupItems = experimentalGroupHashMap[hash] ?? [];
 
       if (controlGroupItems.isEmpty) {
-        // 실험군에만 존재 (onlyExperimental)
+        // 실험군에만 존재 (onlyB)
         for (FileItem item in experimentalGroupItems) {
           results.add(
             CompareResult(
-              status: CompareStatus.onlyExperimental,
+              status: CompareStatus.onlyB,
               group1: item,
             ),
           );
         }
       } else if (experimentalGroupItems.isEmpty) {
-        // 대조군에만 존재 (onlyContorl)
+        // 대조군에만 존재 (onlyA)
         for (FileItem item in controlGroupItems) {
           results.add(
             CompareResult(
-              status: CompareStatus.onlyControl,
+              status: CompareStatus.onlyA,
               group0: item,
             ),
           );
@@ -176,8 +176,8 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
       switch (item.status) {
         case CompareStatus.same:             statusCount[0]++; break;
         case CompareStatus.diff:             statusCount[1]++; break;
-        case CompareStatus.onlyControl:      statusCount[2]++; break;
-        case CompareStatus.onlyExperimental: statusCount[3]++; break;
+        case CompareStatus.onlyA:      statusCount[2]++; break;
+        case CompareStatus.onlyB: statusCount[3]++; break;
         default: break;
       }
     }
@@ -210,8 +210,8 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
               switch (res.status) {
                 case CompareStatus.same:             tileColor = Theme.of(context).colorScheme.highlightSame; break;
                 case CompareStatus.diff:             tileColor = Theme.of(context).colorScheme.highlightDiff; break;
-                case CompareStatus.onlyControl:      tileColor = Theme.of(context).colorScheme.highlightOther; break;
-                case CompareStatus.onlyExperimental: tileColor = Theme.of(context).colorScheme.highlightOther; break;
+                case CompareStatus.onlyA:      tileColor = Theme.of(context).colorScheme.highlightOther; break;
+                case CompareStatus.onlyB: tileColor = Theme.of(context).colorScheme.highlightOther; break;
                 default: tileColor = Theme.of(context).colorScheme.highlightOther; break;
               }
 

@@ -90,7 +90,7 @@ void compareTaskEntry(List<dynamic> args) async {
   final sw = Stopwatch()..start();
   int tick = 0;
 
-  HashMap<String,int> controlGroupMap = HashMap();
+  HashMap<String,int> groupAMap = HashMap();
   /// {'상대경로': 비교상태}
   /// -1 : 비교전
   /// -2 : 비교후(같음)
@@ -105,18 +105,18 @@ void compareTaskEntry(List<dynamic> args) async {
     batch[file] = -1;
     if(tick < sw.elapsed.inSeconds) {
       sendPort.send(batch);
-      controlGroupMap.addAll(batch);
+      groupAMap.addAll(batch);
       batch.clear();
       tick = sw.elapsed.inSeconds;
     }
   }
   sendPort.send(batch);
-  controlGroupMap.addAll(batch);
+  groupAMap.addAll(batch);
   batch.clear();
 
   // 실험군 순회
   for (String file in group1Files) {
-    int? existing = controlGroupMap[file];
+    int? existing = groupAMap[file];
     if (existing == null) {
       // 같은 경로가 없음 -> 비교후(only1)
       batch[file] = -5;
@@ -147,7 +147,7 @@ void compareTaskEntry(List<dynamic> args) async {
     // 초단위 전송
     if(tick < sw.elapsed.inSeconds) {
       sendPort.send(batch);
-      controlGroupMap.addAll(batch);
+      groupAMap.addAll(batch);
       batch.clear();
       tick = sw.elapsed.inSeconds;
     }
@@ -155,11 +155,11 @@ void compareTaskEntry(List<dynamic> args) async {
   // 남은 batch 전체 적용 & 전송
   if (batch.length > 0) {
     sendPort.send(batch);
-    controlGroupMap.addAll(batch);
+    groupAMap.addAll(batch);
     batch.clear();
   }
   // 대조군에만 해당하는 내용 적용: 비교중 -> 비교후(only0)
-  controlGroupMap.forEach((path, state) {
+  groupAMap.forEach((path, state) {
     if (state == -1) batch[path] = -4;
   });
   // 적용된 상태 전체 전송

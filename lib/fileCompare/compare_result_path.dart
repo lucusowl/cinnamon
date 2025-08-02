@@ -55,10 +55,10 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   String lastItem = '';        // 마지막 비교 파일명
   Stopwatch sw = Stopwatch();  // 시간측정용
 
-  bool isActionMode = false;    // 현재 추가작업모드 여부
-  bool isActionOngoing = false; // 추가작업 진행중 여부
-  String actionDirection = 'AB'; // 적용방향
-  List<bool> actionTargets = [false, false, false, false]; // 적용대상
+  bool isAfterActionMode = false;     // 현재 추가작업모드 여부
+  bool isAfterActionOngoing = false;  // 추가작업 진행중 여부
+  String afterActionDirection = 'AB'; // 적용방향
+  List<bool> afterActionTargetStatus = [false, false, false, false]; // 적용대상
 
   @override
   void initState() {
@@ -121,14 +121,14 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                   batchCnt += 2;
                 } else if (state == -4) {
                   // 비교완료(only0) -> 변경(상태)
-                  resultHashMap[path]?.status = CompareStatus.onlyControl;
+                  resultHashMap[path]?.status = CompareStatus.onlyA;
                   batchCnt += 1;
                 } else if (state == -5) {
                   // 비교완료(only1) -> 추가(group1추가)
                   var currentFilePath = pathlib.join(group1BasePath, path);
                   var currentFileStat = File(currentFilePath).statSync();
                   CompareResult ret = CompareResult(
-                    status: CompareStatus.onlyExperimental,
+                    status: CompareStatus.onlyB,
                     base: path,
                     group0: null,
                     group1: FileItem(
@@ -205,7 +205,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   }
 
   /// 값 변환
-  String compactSize(int bytes, [int fractionDigits = 2]) {
+  String _compactSize(int bytes, [int fractionDigits = 2]) {
     const suffixes = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
     double size = bytes.toDouble();
     int index = 0;
@@ -218,7 +218,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   }
 
   /// 결과 데이터
-  Widget buildRowData(String label, dynamic value, {bool diffValue = false}) {
+  Widget _buildRowData(String label, dynamic value, {bool diffValue = false}) {
     TextStyle? textColorStyle;
     if (diffValue) {
       if (value is int) {
@@ -237,11 +237,11 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
       } else if (value is int) { // 파일 크기
         var size = NumberFormat.decimalPattern().format(value);
         if (diffValue) {
-          if (value > 0)      displayText = '+ ${compactSize(value)} ($size bytes)';
-          else if (value < 0) displayText = '- ${compactSize(value.abs())} ($size bytes)';
-          else                displayText = '${compactSize(value)} ($size bytes)';
+          if (value > 0)      displayText = '+ ${_compactSize(value)} ($size bytes)';
+          else if (value < 0) displayText = '- ${_compactSize(value.abs())} ($size bytes)';
+          else                displayText = '${_compactSize(value)} ($size bytes)';
         } else {
-          displayText = '${compactSize(value)} ($size bytes)';
+          displayText = '${_compactSize(value)} ($size bytes)';
         }
       } else if (value is DateTime) { // 시각
         displayText = DateFormat('yyyy년 M월 d일 E a h:m:s.S').format(value);
@@ -272,7 +272,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   }
 
   /// 비교 결과 상세 보기
-  void showDetail(CompareResult result) {
+  void _showDetail(CompareResult result) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -313,8 +313,8 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                           ExpansionTile(
                             title: const Text("절대경로"),
                             children: [
-                              if(result.group0 != null) buildRowData('Group A', result.group0!.fullPath),
-                              if(result.group1 != null) buildRowData('Group B', result.group1!.fullPath),
+                              if(result.group0 != null) _buildRowData('Group A', result.group0!.fullPath),
+                              if(result.group1 != null) _buildRowData('Group B', result.group1!.fullPath),
                             ],
                             initiallyExpanded: true,
                             shape: Border.fromBorderSide(BorderSide.none),
@@ -325,9 +325,9 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                           ExpansionTile(
                             title: const Text("파일크기"),
                             children: [
-                              if(result.group0 != null) buildRowData('Group A', result.group0!.fileSize),
-                              if(result.group0 != null && result.group1 != null) buildRowData('∆', result.group1!.fileSize - result.group0!.fileSize, diffValue: true),
-                              if(result.group1 != null) buildRowData('Group B', result.group1!.fileSize),
+                              if(result.group0 != null) _buildRowData('Group A', result.group0!.fileSize),
+                              if(result.group0 != null && result.group1 != null) _buildRowData('∆', result.group1!.fileSize - result.group0!.fileSize, diffValue: true),
+                              if(result.group1 != null) _buildRowData('Group B', result.group1!.fileSize),
                             ],
                             shape: Border.fromBorderSide(BorderSide.none),
                             childrenPadding: const EdgeInsets.all(16.0),
@@ -337,9 +337,9 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                           ExpansionTile(
                             title: const Text("마지막 수정 시각"),
                             children: [
-                              if(result.group0 != null) buildRowData('Group A', result.group0!.modified),
-                              if(result.group0 != null && result.group1 != null) buildRowData('∆', result.group1!.modified.difference(result.group0!.modified), diffValue: true),
-                              if(result.group1 != null) buildRowData('Group B', result.group1!.modified),
+                              if(result.group0 != null) _buildRowData('Group A', result.group0!.modified),
+                              if(result.group0 != null && result.group1 != null) _buildRowData('∆', result.group1!.modified.difference(result.group0!.modified), diffValue: true),
+                              if(result.group1 != null) _buildRowData('Group B', result.group1!.modified),
                             ],
                             shape: Border.fromBorderSide(BorderSide.none),
                             childrenPadding: const EdgeInsets.all(16.0),
@@ -349,9 +349,9 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                           ExpansionTile(
                             title: const Text("최근 접근 시각"),
                             children: [
-                              if(result.group0 != null) buildRowData('Group A', result.group0!.accessed),
-                              if(result.group0 != null && result.group1 != null) buildRowData('∆', result.group1!.accessed.difference(result.group0!.accessed), diffValue: true),
-                              if(result.group1 != null) buildRowData('Group B', result.group1!.accessed),
+                              if(result.group0 != null) _buildRowData('Group A', result.group0!.accessed),
+                              if(result.group0 != null && result.group1 != null) _buildRowData('∆', result.group1!.accessed.difference(result.group0!.accessed), diffValue: true),
+                              if(result.group1 != null) _buildRowData('Group B', result.group1!.accessed),
                             ],
                             shape: Border.fromBorderSide(BorderSide.none),
                             childrenPadding: const EdgeInsets.all(16.0),
@@ -376,10 +376,10 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
     List<int> statusCount = [0,0,0,0];
     for(CompareResult item in resultHashMap.values) {
       switch (item.status) {
-        case CompareStatus.same:             statusCount[0]++; break;
-        case CompareStatus.diff:             statusCount[1]++; break;
-        case CompareStatus.onlyControl:      statusCount[2]++; break;
-        case CompareStatus.onlyExperimental: statusCount[3]++; break;
+        case CompareStatus.same:  statusCount[0]++; break;
+        case CompareStatus.diff:  statusCount[1]++; break;
+        case CompareStatus.onlyA: statusCount[2]++; break;
+        case CompareStatus.onlyB: statusCount[3]++; break;
         default:
       }
     }
@@ -423,12 +423,12 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                   tileColor = Theme.of(context).colorScheme.highlightDiff;
                   tileTooltip = 'Group A:${res.group0!.fullPath}\nGroup B:${res.group1!.fullPath}';
                   break;
-                case CompareStatus.onlyControl:
+                case CompareStatus.onlyA:
                   tileIcon  = Icon(Icons.arrow_back); // Icons.arrow_circle_left_outlined
                   tileColor = Theme.of(context).colorScheme.highlightOther;
                   tileTooltip = res.group0!.fullPath;
                   break;
-                case CompareStatus.onlyExperimental:
+                case CompareStatus.onlyB:
                   tileIcon  = Icon(Icons.arrow_forward); // Icons.arrow_circle_right_outlined
                   tileColor = Theme.of(context).colorScheme.highlightOther;
                   tileTooltip = res.group1!.fullPath;
@@ -454,7 +454,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                       child: ListTile(
                         leading: tileIcon,
                         title: Text(res.base),
-                        onTap: () => showDetail(res),
+                        onTap: () => _showDetail(res),
                       ),
                     ),
                   ),
@@ -471,14 +471,14 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   /// 현재 진행률 표시
   Widget _progressWidget() {
     if (progressPercent == -1) {
-      return Column(
+      return const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Text('대상을 불러오고 있는 중입니다...'),
           ),
-          const LinearProgressIndicator(minHeight: 8.0),
+          LinearProgressIndicator(minHeight: 8.0),
         ],
       );
     } else if (progressPercent == 1.0) {
@@ -514,13 +514,13 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   /// 선택지 위젯 (라디오 버튼)
   Widget _buildRadioSelection(String label, String selectedValue) {
     return Expanded(child: InkWell(
-      onTap: () {setState(() => actionDirection = selectedValue);},
+      onTap: () {setState(() => afterActionDirection = selectedValue);},
       child: Row(
         children: [
           Radio<String>(
             value: selectedValue,
-            groupValue:actionDirection,
-            onChanged: (value) {setState(() => actionDirection = value ?? selectedValue);}
+            groupValue:afterActionDirection,
+            onChanged: (value) {setState(() => afterActionDirection = value ?? selectedValue);}
           ),
           Text(label),
         ],
@@ -530,12 +530,12 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   /// 선택지 위젯 (체크박스 버튼)
   Widget _buildCheckboxSelection(String label, int selectedIndex) {
     return Expanded(child: InkWell(
-      onTap: () {setState(() => actionTargets[selectedIndex] = !actionTargets[selectedIndex]);},
+      onTap: () {setState(() => afterActionTargetStatus[selectedIndex] = !afterActionTargetStatus[selectedIndex]);},
       child: Row(
         children: [
           Checkbox(
-            value: actionTargets[selectedIndex],
-            onChanged: (checked) {setState(() => actionTargets[selectedIndex] = !actionTargets[selectedIndex]);}
+            value: afterActionTargetStatus[selectedIndex],
+            onChanged: (checked) {setState(() => afterActionTargetStatus[selectedIndex] = !afterActionTargetStatus[selectedIndex]);}
           ),
           Text(label),
         ],
@@ -544,16 +544,16 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   }
 
   /// 추가작업 수행
-  void _actionInit(String actionType) async { // move, delete, copy
+  void _afterActionInit(String actionType) async { // move, delete, copy
     // 1. 현재 인자 검증
     late final bool isFromGroupA;
     late final String srcPath;
     late final String dstPath;
-    if (actionDirection == 'AB') {
+    if (afterActionDirection == 'AB') {
       srcPath = group0BasePath;
       dstPath = group1BasePath;
       isFromGroupA = true;
-    } else if (actionDirection == 'BA') {
+    } else if (afterActionDirection == 'BA') {
       srcPath = group1BasePath;
       dstPath = group0BasePath;
       isFromGroupA = false;
@@ -563,15 +563,15 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
     }
     // 2. 순회하며 대상 필터링
     List<bool> targetStatus = [];
-    for (bool flag in actionTargets) {targetStatus.add(flag);}
+    for (bool flag in afterActionTargetStatus) {targetStatus.add(flag);}
     List<String> targets = [];
     resultHashMap.forEach((path, itemCase) {
       final itemStatus = itemCase.status;
       if (
         (itemStatus == CompareStatus.same && targetStatus[0])
         || (itemStatus == CompareStatus.diff && targetStatus[1])
-        || (itemStatus == CompareStatus.onlyControl && targetStatus[2])
-        || (itemStatus == CompareStatus.onlyExperimental && targetStatus[3])
+        || (itemStatus == CompareStatus.onlyA && targetStatus[2])
+        || (itemStatus == CompareStatus.onlyB && targetStatus[3])
       ) {
         targets.add(itemCase.base);
       }
@@ -588,7 +588,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
       return;
     }
     setState(() {
-      isActionOngoing = true;
+      isAfterActionOngoing = true;
       progressPercent = -1;
     });
     // 3. isolate 시작 호출 + 응답 정의
@@ -613,8 +613,8 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
           if (resultItem == null) {
             /// 도중에 삭제된 상태임 -> 오류
           } else {
-            if (isFromGroupA && resultItem.status == CompareStatus.onlyExperimental
-              || !isFromGroupA && resultItem.status == CompareStatus.onlyControl) {
+            if (isFromGroupA && resultItem.status == CompareStatus.onlyB
+              || !isFromGroupA && resultItem.status == CompareStatus.onlyA) {
               // 추가작업 후에도 상태 변화가 없는 경우
             } else if (actionType == 'copy') {
               // 복사작업 후 상태가 변경된 경우 (양쪽이 같은 파일을 가짐)
@@ -642,15 +642,15 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                 );
               }
             } else if (actionType == 'delete'
-              && (isFromGroupA && resultItem.status == CompareStatus.onlyControl
-                || !isFromGroupA && resultItem.status == CompareStatus.onlyExperimental)) {
+              && (isFromGroupA && resultItem.status == CompareStatus.onlyA
+                || !isFromGroupA && resultItem.status == CompareStatus.onlyB)) {
               // 삭제작업 후 상태가 변경된 경우 (파일없앰)
               resultList.remove(resultItem);
               resultHashMap.remove(item);
             } else {
               // 이외 모든 상태 변경 (받는쪽만 파일존재)
               if (isFromGroupA) {
-                resultItem.status = CompareStatus.onlyExperimental;
+                resultItem.status = CompareStatus.onlyB;
                 if (resultItem.group0 != null) {resultItem.group0 = null;}
                 if (resultItem.group1 == null) {
                   var currentFilePath = pathlib.join(group1BasePath, item);
@@ -664,7 +664,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
                   );
                 }
               } else {
-                resultItem.status = CompareStatus.onlyControl;
+                resultItem.status = CompareStatus.onlyA;
                 if (resultItem.group0== null) {
                   var currentFilePath = pathlib.join(group0BasePath, item);
                   var currentFileStat = File(currentFilePath).statSync();
@@ -697,7 +697,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
       () {
         debugPrint('추가 작업 완료');
         setState(() {
-          isActionOngoing = false;
+          isAfterActionOngoing = false;
           sw.stop();
         });
       },
@@ -713,12 +713,12 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
   }
 
   /// 추가작업 취소
-  void _actionCancel() {
+  void _afterActionCancel() {
     // 1. isolate 취소 호출
     ServiceFileCompare().compareAfterTaskCancel();
     // 2. 추가작업 상태자 변경, 타이머 정지
     setState(() {
-      isActionOngoing = false;
+      isAfterActionOngoing = false;
       sw.stop();
       if (progressPercent == -1) {progressPercent = 1.0;}
     });
@@ -727,11 +727,11 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
 
   /// 작업에 따른 하단 버튼바
   Widget _buildBottomActionBar() {
-    if (isActionMode) {
+    if (isAfterActionMode) {
       return Column(
         spacing: 8.0,
         children: [
-          if(!isActionOngoing) Row(
+          if(!isAfterActionOngoing) Row(
             spacing: 8.0,
             children: [
               const SizedBox(width: 80, child: Text('적용방향', textAlign: TextAlign.center,)),
@@ -739,7 +739,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
               _buildRadioSelection('Group B -> A', 'BA'),
             ]
           ),
-          if(!isActionOngoing) Row(
+          if(!isAfterActionOngoing) Row(
             spacing: 8.0,
             children: [
               const SizedBox(width: 80, child: Text('적용대상', textAlign: TextAlign.center)),
@@ -756,24 +756,24 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(child: ElevatedButton.icon(
-                  onPressed: (isActionOngoing)? null: () {_actionInit('move');}, // 이동 작업 시작
+                  onPressed: (isAfterActionOngoing)? null: () {_afterActionInit('move');}, // 이동 작업 시작
                   icon: const Icon(Icons.drive_file_move),
                   label: const Text("병합(이동)")
                 )),
                 Expanded(child: ElevatedButton.icon(
-                  onPressed: (isActionOngoing)? null: () {_actionInit('delete');}, // 삭제 작업 시작
+                  onPressed: (isAfterActionOngoing)? null: () {_afterActionInit('delete');}, // 삭제 작업 시작
                   icon: const Icon(Icons.delete),
                   label: const Text("삭제(출발지 대상)"),
                 )),
                 Expanded(child: ElevatedButton.icon(
-                  onPressed: (isActionOngoing)? null: () {_actionInit('copy');}, // 복사 작업 시작
+                  onPressed: (isAfterActionOngoing)? null: () {_afterActionInit('copy');}, // 복사 작업 시작
                   icon: const Icon(Icons.file_copy),
                   label: const Text("복사"),
                 )),
                 Expanded(child: ElevatedButton.icon(
-                  onPressed: (isActionOngoing)
-                    ? _actionCancel // 작업 취소
-                    : () => setState(() {isActionMode = false; isActionOngoing = false;}),
+                  onPressed: (isAfterActionOngoing)
+                    ? _afterActionCancel // 작업 취소
+                    : () => setState(() {isAfterActionMode = false; isAfterActionOngoing = false;}),
                   icon: const Icon(Icons.cancel),
                   label: const Text("추가작업 취소"),
                 )),
@@ -800,7 +800,7 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
               label: const Text("초기화"),
             )),
             Expanded(child: ElevatedButton.icon(
-              onPressed: (progressPercent == 1.0)? () {setState(() {isActionMode = true; isActionOngoing = false;});}: null,
+              onPressed: (progressPercent == 1.0)? () {setState(() {isAfterActionMode = true; isAfterActionOngoing = false;});}: null,
               icon: const Icon(Icons.forward),
               label: const Text("추가작업"),
             )),

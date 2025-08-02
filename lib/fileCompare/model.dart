@@ -22,10 +22,10 @@ class FileItem {
 
 /// 비교 결과 상태값
 enum CompareStatus {
-  before,           // 비교중
-  same,             // 동일
-  diff,             // 다름
-  onlyControl,      // 대조군에만 있음
-  onlyExperimental, // 실험군에만 있음
-  error,            // 오류
+  before, // 비교중
+  same,   // 동일
+  diff,   // 다름
+  onlyA,  // 대조군에만 있음
+  onlyB,  // 실험군에만 있음
+  error,  // 오류
 }
