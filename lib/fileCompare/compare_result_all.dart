@@ -706,7 +706,8 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
           /// | onlyA  | onlyB   | (x)      | same    | onlyA   | onlyA    | onlyA   |
           /// | onlyB  | onlyB   | onlyB    | onlyB   | onlyA   | (x)      | same    |
           /// 
-          CompareResult? resultItem = resultHashMap[groupIdHashMap[pathlib.join(srcPath, itemRelativePath)]];
+          String targetGroupId = groupIdHashMap[pathlib.join(srcPath, itemRelativePath)]!;
+          CompareResult? resultItem = resultHashMap[targetGroupId];
           if (resultItem == null) {
             /// 도중에 삭제된 상태임 -> 오류
           } else {
@@ -722,14 +723,24 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
               // 추가작업 후에도 상태 변화가 없는 경우
             } else if (actionType == 'copy') {
               // 복사작업 후 상태가 변경된 경우 (양쪽이 같은 파일을 가짐)
-              // 1) 반대편 group의 변경이름에 새 FileItem으로 추가
-              String currentFilePath = pathlib.join(dstPath, itemRelativePath);
-              var currentFileStat = File(currentFilePath).statSync();
+              // 1) 모든 결과중 반대편 group의 변경이름에 해당하는 FileItem 제거
+              // 2) 현재 결과의 반대편 group에 변경이름으로 새 FileItem으로 추가
+              String newFilePath = pathlib.join(dstPath, itemRelativePath);
+              String? existNewFileGroupId = groupIdHashMap[newFilePath];
+              if (existNewFileGroupId != null) {
+                // 새 변경이름의 파일이 존재
+                // 1-1) 해당 결과그룹에서 파일제거
+                CompareResult? existNewFileResultItem = resultHashMap[existNewFileGroupId]!;
+                ((isFromGroupA)? existNewFileResultItem.group1: existNewFileResultItem.group0).remove(itemRelativePath);
+                // 1-2) groupIdHashMap에 현재그룹Id덮어씌우기 (삭제 + 추가)
+                groupIdHashMap[newFilePath] = targetGroupId;
+              }
+              var currentFileStat = File(newFilePath).statSync();
               late HashMap otherGroup;
               if (isFromGroupA) { otherGroup = resultItem.group1; }
               else              { otherGroup = resultItem.group0; }
               otherGroup[itemRelativePath] = FileItem(
-                fullPath: currentFilePath,
+                fullPath: newFilePath,
                 relativePath: itemRelativePath,
                 fileSize: currentFileStat.size,
                 modified: currentFileStat.modified,
@@ -742,24 +753,36 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
               if (isFromGroupA) { ownGroup = resultItem.group0; }
               else              { ownGroup = resultItem.group1; }
               ownGroup.remove(itemRelativePath);
+              groupIdHashMap.remove(pathlib.join(srcPath, itemRelativePath));
             } else {
               // 이외 모든 상태 변경 (받는쪽만 파일존재)
-              // 1) 반대편 group의 변경이름에 새 FileItem으로 추가
-              // 2) 본인 group에서 본인 제거
-              String currentFilePath = pathlib.join(dstPath, itemRelativePath);
-              var currentFileStat = File(currentFilePath).statSync();
+              // 1) 모든 결과중 반대편 group의 변경이름에 해당하는 FileItem 제거
+              // 2) 현재 결과의 반대편 group에 변경이름으로 새 FileItem으로 추가
+              // 3) 본인 group에서 본인 제거
+              String newFilePath = pathlib.join(dstPath, itemRelativePath);
+              String? existNewFileGroupId = groupIdHashMap[newFilePath];
+              if (existNewFileGroupId != null) {
+                // 새 변경이름의 파일이 존재
+                // 1-1) 해당 결과그룹에서 파일제거
+                CompareResult? existNewFileResultItem = resultHashMap[existNewFileGroupId]!;
+                ((isFromGroupA)? existNewFileResultItem.group1: existNewFileResultItem.group0).remove(itemRelativePath);
+                // 1-2) groupIdHashMap에 현재그룹Id덮어씌우기 (삭제 + 추가)
+                groupIdHashMap[newFilePath] = targetGroupId;
+              }
+              var currentFileStat = File(newFilePath).statSync();
               late HashMap ownGroup;
               late HashMap otherGroup;
               if (isFromGroupA) { ownGroup = resultItem.group0; otherGroup = resultItem.group1; }
               else              { ownGroup = resultItem.group1; otherGroup = resultItem.group0; }
               otherGroup[itemRelativePath] = FileItem(
-                fullPath: currentFilePath,
+                fullPath: newFilePath,
                 relativePath: itemRelativePath,
                 fileSize: currentFileStat.size,
                 modified: currentFileStat.modified,
                 accessed: currentFileStat.accessed
               );
               ownGroup.remove(itemRelativePath);
+              groupIdHashMap.remove(pathlib.join(srcPath, itemRelativePath));
             }
           }
         } catch (error) {
