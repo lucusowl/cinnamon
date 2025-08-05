@@ -782,13 +782,19 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
         debugPrint('추가 작업 완료');
         // 단 한개의 파일도 없는 경우
         // 그룹에 FileItem이 단 한개도 없을 경우 목록에서 삭제
-        resultHashMap.removeWhere((_, compareResultObject) => !compareResultObject.hasFileItem());
+        resultHashMap.removeWhere((_, compareResultObject) {
+          if (!compareResultObject.hasFileItem()) {
+            resultList.remove(compareResultObject);
+            return true;
+          }
+          return false;
+        });
         // 그룹의 상태 전부 변경
         resultHashMap.forEach((_, compareResultObject) {
-          // - 동일하면 -> same
+          // - 양쪽 다 있다면 -> same
           // - 한쪽만 있다면 -> only
           // - 그이외 -> error
-          if (compareResultObject.group0.length == compareResultObject.group1.length) {
+          if (compareResultObject.group0.length > 0 && compareResultObject.group1.length > 0) {
             compareResultObject.status = CompareStatus.same;
           } else if (compareResultObject.group0.length == 0 && compareResultObject.group1.length > 0) {
             compareResultObject.status = CompareStatus.onlyB;
