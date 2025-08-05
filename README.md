@@ -8,7 +8,7 @@ Project Cinnamon
 이 도구는 Flutter를 기반으로 개발되었습니다.  
 
 ## 설치 및 사용 Install & Usage
-[![Windows x64](https://img.shields.io/badge/Windows_x64-blue.svg)](https://github.com/lucusowl/cinnamon/releases/download/v1.1.0/release-v1.1.0-windows-x64.zip)
+[![Windows x64](https://img.shields.io/badge/Windows_x64-blue.svg)](https://github.com/lucusowl/cinnamon/releases/download/v1.1.1/release-v1.1.1-windows-x64.zip)
 
 실행파일을 환경에 맞게 [다운로드](https://github.com/lucusowl/cinnamon/releases/latest/)하여 사용할 수 있습니다.  
 
