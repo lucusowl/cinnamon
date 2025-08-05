@@ -256,6 +256,9 @@ void compareAfterTaskEntry(List<dynamic> args) async {
         switch (actionMode) {
           case 'move':
             final newPath = pathlib.join(dstPath!, filePath);
+            // 경로에 맞는 디렉토리가 없는 경우 생성 후 이동
+            var newPathDir = Directory(newPath).parent;
+            if (!await newPathDir.exists()) {await newPathDir.create(recursive: true);}
             await File(srcFullPath).rename(newPath);
             break;
           case 'delete':
@@ -263,6 +266,9 @@ void compareAfterTaskEntry(List<dynamic> args) async {
             break;
           case 'copy':
             final newPath = pathlib.join(dstPath!, filePath);
+            // 경로에 맞는 디렉토리가 없는 경우 생성 후 복사
+            var newPathDir = Directory(newPath).parent;
+            if (!await newPathDir.exists()) {await newPathDir.create(recursive: true);}
             await File(srcFullPath).copy(newPath);
             break;
           default: // 이외의 다른 작업은 무시
@@ -271,7 +277,7 @@ void compareAfterTaskEntry(List<dynamic> args) async {
       } on PathNotFoundException catch (_) {
         // 파일이 없을 경우, 무시
       } catch (error) {
-        throw FileException('파일작업 중 오류가 발생했습니다.\n$error');
+        rethrow;
       }
     });
   }
@@ -449,7 +455,7 @@ class ServiceFileCompare {
       debugPrint('취소작업 완료');
     }
   }
-  /// TODO: 파일 전체 비교 시작
+  /// 파일 전체 비교 시작
   Future<List> compareWithAllTaskStart(
     void Function(dynamic) eventCallback,      // 작업 결과(sendPort 포함) 처리
     void Function(dynamic) eventErrorCallback, // 작업 에러 처리
