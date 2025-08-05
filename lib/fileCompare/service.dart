@@ -170,6 +170,75 @@ void compareWithPathTaskEntry(List<dynamic> args) async {
   sw.stop();
 }
 
+/// 전체 비교 메인 기능
+void compareWithAllTaskEntry(List args) async {
+  // << [sendPort, [[바탕경로, [하위상대경로, ]],]]
+  // >> {해시|크기: [Group A 상대경로, ], [Group B 상대경로, ]}
+  final SendPort sendPort        = args[0];
+  final String group0BasePath    = args[1][0][0];
+  final List<String> group0Files = args[1][0][1];
+  final String group1BasePath    = args[1][1][0];
+  final List<String> group1Files = args[1][1][1];
+
+  HashMap<int,List<List<String>>> sizeCompareMap = HashMap();
+
+  // 1차: 크기 순회
+  for (var filePath in group0Files) {
+    var fileSize = await File(pathlib.join(group0BasePath, filePath)).length();
+    if (sizeCompareMap.containsKey(fileSize)) {
+      sizeCompareMap[fileSize]![0].add(filePath);
+    } else {
+      sizeCompareMap[fileSize] = [[filePath],[]];
+    }
+  }
+  for (var filePath in group1Files) {
+    var fileSize = await File(pathlib.join(group1BasePath, filePath)).length();
+    if (sizeCompareMap.containsKey(fileSize)) {
+      sizeCompareMap[fileSize]![1].add(filePath);
+    } else {
+      sizeCompareMap[fileSize] = [[],[filePath]];
+    }
+  }
+
+  // 2차: 해시 순회
+  sizeCompareMap.forEach((size, items) async {
+    if (items[0].length + items[1].length == 1) {
+      // 해당 크기를 가진 파일이 전체에서 1개만 있는 경우
+      // -> 바로 결과 전송
+      sendPort.send({size: items});
+    } else {
+      // 해당크기를 가진 파일이 여러개 있는 경우
+      // -> 그룹 내에서 hash 비교
+      // -> 같이 묶인 결과끼리 묶어 결과 전송
+      HashMap<String,List<List<String>>> hashCompareMap = HashMap();
+
+      for (var filePath in items[0]) {
+        var hash = md5.convert(
+          await File(pathlib.join(group0BasePath, filePath)).readAsBytes()
+        ).toString();
+
+        if (hashCompareMap.containsKey(hash)) {
+          hashCompareMap[hash]![0].add(filePath);
+        } else {
+          hashCompareMap[hash] = [[filePath],[]];
+        }
+      }
+      for (var filePath in items[1]) {
+        var hash = md5.convert(
+          await File(pathlib.join(group1BasePath, filePath)).readAsBytes()
+        ).toString();
+
+        if (hashCompareMap.containsKey(hash)) {
+          hashCompareMap[hash]![1].add(filePath);
+        } else {
+          hashCompareMap[hash] = [[],[filePath]];
+        }
+      }
+      sendPort.send(hashCompareMap);
+    }
+  });
+}
+
 /// 추가작업 메인 기능
 void compareAfterTaskEntry(List<dynamic> args) async {
   final SendPort sendPort  = args[0];
@@ -178,8 +247,7 @@ void compareAfterTaskEntry(List<dynamic> args) async {
   final String? dstPath    = args[3];
   final List<String> files = args[4];
 
-  final concurrencyLimit = 10;
-  final semaphore = AsyncSemaphore(concurrencyLimit);
+  final semaphore = AsyncSemaphore(10);
 
   for (final filePath in files) {
     semaphore.run(() async {
@@ -231,6 +299,7 @@ class ServiceFileCompare {
     uploadTaskCancel(0);
     uploadTaskCancel(1);
     compareWithPathTaskCancel();
+    compareWithAllTaskCancel();
     compareAfterTaskCancel();
     if (restart && pathGroup[0] != null && pathGroup[1] != null) {
       // 그룹 재조사
@@ -363,6 +432,60 @@ class ServiceFileCompare {
       ret[i++] = groupItem;
     }
     return ret;
+  }
+
+  /// 파일 전체 비교 취소
+  void compareWithAllTaskCancel() async {
+    TaskCompleter? task = _compareTask;
+    if (task != null) {
+      task.isCancel = true;
+      if (task.isolate != null) {
+        task.isolate!.kill(priority: Isolate.immediate);
+        task.isolate = null;
+        debugPrint('isolate 존재하여 kill 요청');
+      }
+      task.closeAllPorts();
+      task = null;
+      debugPrint('취소작업 완료');
+    }
+  }
+  /// TODO: 파일 전체 비교 시작
+  Future<List> compareWithAllTaskStart(
+    void Function(dynamic) eventCallback,      // 작업 결과(sendPort 포함) 처리
+    void Function(dynamic) eventErrorCallback, // 작업 에러 처리
+    void Function() eventDoneCallback          // 작업 완료 처리
+  ) async {
+    // 모든 upload Task 완료까지 대기
+    List<Future<List>> futures = [];
+    if (_uploadTask[0] == null) {throw TaskException('Group 0 에 업로드된 파일이 없습니다.');}
+    else {futures.add(_uploadTask[0]!.completer.future);}
+    if (_uploadTask[1] == null) {throw TaskException('Group 1 에 업로드된 파일이 없습니다.');}
+    else {futures.add(_uploadTask[1]!.completer.future);}
+    List<List> uploadResults = await Future.wait(futures); // [[바탕경로, [하위상대경로, ...]], ...]
+
+    // task 등록
+    TaskCompleter task = TaskCompleter();
+    _compareTask = task;
+    // isolate listener 등록
+    final dataPort = ReceivePort();
+    final errorPort = ReceivePort();
+    final exitPort = ReceivePort();
+    dataPort.listen(eventCallback);
+    errorPort.listen(eventErrorCallback);
+    exitPort.listen((event) {
+      eventDoneCallback();
+      task.closeAllPorts();
+    });
+    task.ports = [dataPort, errorPort, exitPort];
+    // isolate compare 등록 & 시작
+    task.isolate = await Isolate.spawn(
+      compareWithAllTaskEntry,
+      [dataPort.sendPort, uploadResults],
+      onError: errorPort.sendPort,
+      onExit: exitPort.sendPort,
+    );
+
+    return uploadResults;
   }
 
   /// 파일 추가작업 취소
