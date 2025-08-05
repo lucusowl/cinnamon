@@ -11,3 +11,7 @@ This project includes third-party libraries:
 - path
   License: BSD-3-Clause
   https://pub.dev/packages/path
+
+- intl
+  License: BSD-3-Clause
+  https://pub.dev/packages/intl

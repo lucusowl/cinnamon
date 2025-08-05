@@ -309,7 +309,6 @@ class ServiceFileCompare {
       // 그룹 초기화
       pathGroup = [null, null];
     }
-    debugPrint('작업과 대상 모두 초기화 완료');
   }
 
   /// 파일 업로드 취소
@@ -320,11 +319,9 @@ class ServiceFileCompare {
       if (task.isolate != null) {
         task.isolate!.kill(priority: Isolate.immediate);
         task.isolate = null;
-        debugPrint('isolate 존재하여 kill 요청');
       }
       task.closeAllPorts();
       task = null;
-      debugPrint('업로드작업 취소완료');
     }
   }
   /// 파일 업로드 시작
@@ -346,20 +343,17 @@ class ServiceFileCompare {
       if (event is List) {
         // 작업종료 -> [바탕경로, [하위상대경로, ...]]
         if (!task.isCancel) {
-          debugPrint('업로드작업 완료:$groupIndex:${task.isCancel}:$path');
           task.completer.complete(event);
         }
       } else {
         // 작업에러, 부적절한 반환값
         if (!task.isCancel) {
-          debugPrint('업로드작업 오류:부적절한 반환값:$groupIndex:$path');
           task.completer.completeError(TaskException(event));
         }
       }
     });
     errorPort.listen((error) {
       if (!task.isCancel) {
-        debugPrint('업로드작업 오류:작업내 오류:$groupIndex:$path');
         task.completer.completeError(TaskException(error));
       }
     });
@@ -382,11 +376,9 @@ class ServiceFileCompare {
       if (task.isolate != null) {
         task.isolate!.kill(priority: Isolate.immediate);
         task.isolate = null;
-        debugPrint('isolate 존재하여 kill 요청');
       }
       task.closeAllPorts();
       task = null;
-      debugPrint('취소작업 완료');
     }
   }
   /// 파일 경로 비교 시작
@@ -442,14 +434,12 @@ class ServiceFileCompare {
       if (task.isolate != null) {
         task.isolate!.kill(priority: Isolate.immediate);
         task.isolate = null;
-        debugPrint('isolate 존재하여 kill 요청');
       }
       task.closeAllPorts();
       task = null;
-      debugPrint('취소작업 완료');
     }
   }
-  /// TODO: 파일 전체 비교 시작
+  /// 파일 전체 비교 시작
   Future<List> compareWithAllTaskStart(
     void Function(dynamic) eventCallback,      // 작업 결과(sendPort 포함) 처리
     void Function(dynamic) eventErrorCallback, // 작업 에러 처리
@@ -496,11 +486,9 @@ class ServiceFileCompare {
       if (task.isolate != null) {
         task.isolate!.kill(priority: Isolate.immediate);
         task.isolate = null;
-        debugPrint('isolate 존재하여 kill 요청');
       }
       task.closeAllPorts();
       task = null;
-      debugPrint('취소작업 완료');
     }
   }
   /// 파일 추가작업 시작

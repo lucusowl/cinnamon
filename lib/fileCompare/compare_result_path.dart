@@ -166,7 +166,6 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
           },
           /// 작업 종료, 취소되는 경우도 고려
           () {
-            debugPrint('비교 완료');
             setState(() => sw.stop());
           },
         );
@@ -695,7 +694,6 @@ class _CompareResultPathPageState extends State<CompareResultPathPage> {
       },
       // 작업 종료, 취소/에러되는 경우도 고려
       () {
-        debugPrint('추가 작업 완료');
         setState(() {
           isAfterActionOngoing = false;
           sw.stop();

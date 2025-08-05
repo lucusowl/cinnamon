@@ -95,7 +95,6 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
           /// 작업 결과 수신, 수신되는 대로 비동기 실행됨
           /// batch 결과구조:`{크기/해시값: [[group0 상대경로, ...], [group1 상대경로, ...]]}`
           (batch) {
-            debugPrint('$batch');
             int batchCnt = 0;
             try {
               (batch as Map<dynamic,List<List<String>>>).forEach((_, items) {
@@ -213,7 +212,6 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
           },
           /// 작업 종료, 취소되는 경우도 고려
           () {
-            debugPrint('비교 완료');
             setState(() => sw.stop());
           },
         );
@@ -779,7 +777,6 @@ class _CompareResultAllPageState extends State<CompareResultAllPage> {
       },
       // 작업 종료, 취소/에러되는 경우도 고려
       () {
-        debugPrint('추가 작업 완료');
         // 단 한개의 파일도 없는 경우
         // 그룹에 FileItem이 단 한개도 없을 경우 목록에서 삭제
         resultHashMap.removeWhere((_, compareResultObject) {
